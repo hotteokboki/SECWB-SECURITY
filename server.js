@@ -33,7 +33,9 @@ const pgSession = require("connect-pg-simple")(session);
 const cookieParser = require("cookie-parser");
 const { addProgram } = require("./controllers/programsController");
 const profileRoutes = require("./routes/profileRoutes.js");
-
+const csrf = require('csurf');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { getMentorsBySocialEnterprises, 
         getMentorById, 
         getAllMentors, 
@@ -114,12 +116,17 @@ const allowedOrigin = process.env.NODE_ENV === 'production'
   ? process.env.PROD_CORS_URL
   : process.env.DEV_CORS_URL;
 
+app.use(cookieParser());
+
+// Set Secure headers
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false
+}));
+
 app.use(cors({
   origin: allowedOrigin,
   credentials: true
 }));
-
-app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -142,6 +149,32 @@ app.use(session({
     maxAge: 1000 * 60 * 60 * 24,
   },
 }));
+
+const loginLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 5,
+  handler: (req, res) => {
+    const now = Date.now();
+    const reset = req.rateLimit.resetTime ? req.rateLimit.resetTime.getTime() : now + 60000;
+    const retryAfterSec = Math.max(0, Math.ceil((reset - now) / 1000));
+
+    res.status(429).json({
+      message: `Too many login attempts. Please try again after ${retryAfterSec} seconds.`,
+      retryAfter: retryAfterSec
+    });
+  }
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // 100 requests per IP
+  message: "Too many requests. Please try again shortly."
+});
+
+// Prevents DoS and Brute force
+app.use("/api/", apiLimiter);
+
+const csrfProtection = csrf({ cookie: true });
 
 // API Routes
 //TODO
@@ -222,6 +255,19 @@ console.log("First row preview:", data[0]);
   }
 });
 
+const isAuthenticated = (req, res, next) => {
+  if (req.session && req.session.isAuth && req.session.user) {
+    return next();
+  }
+  return res.status(401).json({ message: "Unauthorized. Please log in first." });
+};
+
+const isAjaxRequest = (req, res, next) => {
+  if (req.get('X-Requested-With') === 'XMLHttpRequest') {
+    return next();
+  }
+  return res.status(403).json({ message: "Forbidden: direct access not allowed" });
+};
 
 // Temporary storage for user states
 const userStates = {};
@@ -589,7 +635,13 @@ function formatTimeLabel(time24) {
   return `${hours}:${minutesStr} ${suffix}`;
 }
 
-app.post("/login", async (req, res) => {
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
+  const token = req.csrfToken();
+  res.cookie('XSRF-TOKEN', token);
+  res.json({ csrfToken: token });
+});
+
+app.post("/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -630,7 +682,7 @@ app.post("/login", async (req, res) => {
     }
 
     if (!user.isactive) {
-      return res.status(403).json({
+      return res.status(401).json({
         message:
           "Your account is pending verification. Please wait for LSEED to verify your account.",
       });
@@ -656,7 +708,7 @@ app.post("/login", async (req, res) => {
 
     // Respond appropriately
     if (cleanedRoles.includes("Administrator")) { // Use .includes() for array check
-      return res.json({
+      return res.status(200).json({
         message: "Admin login successful",
         user: {
           id: user.user_id,
@@ -667,7 +719,7 @@ app.post("/login", async (req, res) => {
         redirect: "/admin",
       });
     } else {
-      return res.json({
+      return res.status(200).json({
         message: "User login successful",
         user: {
           id: user.user_id,
@@ -711,7 +763,7 @@ app.post("/logout", (req, res) => {
         secure: false, // true if using HTTPS in production
       });
 
-      res.json({ message: "Logout successful" });
+      res.status(200).json({ message: "Logout successful" });
     } catch (dbErr) {
       console.error("DB Error during logout:", dbErr);
       res.status(500).json({ message: "Error deleting session from DB" });
@@ -719,7 +771,7 @@ app.post("/logout", (req, res) => {
   });
 });
 
-app.post("/apply-as-mentor", async (req, res) => {
+app.post("/api/apply-as-mentor", csrfProtection, isAuthenticated, isAjaxRequest, async (req, res) => {
   const {
     affiliation,
     motivation,
@@ -1003,6 +1055,8 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+//Decline Application
+
 app.post("/notify-mentor-application-status", async (req, res) => {
   const { applicationId, status } = req.body;
 
@@ -1066,7 +1120,7 @@ app.post("/notify-mentor-application-status", async (req, res) => {
     });
 
     console.log(`✅ Declined email sent to ${email}`);
-    res.json({ message: "Decline notification email sent successfully." });
+    res.status(200).json({ message: "Decline notification email sent successfully." });
   } catch (err) {
     console.error("❌ Error sending email:", err);
     res.status(500).json({ message: "Failed to send email notification." });
@@ -1400,13 +1454,27 @@ app.post("/accept-mentor-application", async (req, res) => {
   }
 });
 
-app.get("/api/mentors", async (req, res) => {
+app.get("/api/mentors", isAuthenticated, isAjaxRequest, async (req, res) => {
   try {
     const mentors = await getAllMentors();
-    res.json(mentors);
+
+    if (mentors.length === 0) {
+      return res.status(404).json({
+        message: "No mentors found",
+        mentors: []
+      });
+    }
+
+    res.status(200).json({
+      message: "Mentor list retrieved successfully",
+      mentors
+    });
   } catch (error) {
     console.error("❌ Error fetching mentors:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message
+    });
   }
 });
 

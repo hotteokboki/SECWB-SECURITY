@@ -47,6 +47,7 @@ const Mentors = ( {} ) => {
     selectedMentor: "",
     selectedSocialEnterprise: "",
   });
+  const [csrfToken, setCsrfToken] = useState('');
   const [menuOpenBusiness, setMenuOpenBusiness] = useState(false);
   const [menuOpenPreferredTime, setMenuOpenPreferredTime] = useState(false);
   const [menuOpenCommunicationModes, setMenuOpenCommunicationModes] = useState(false);
@@ -134,15 +135,33 @@ const Mentors = ( {} ) => {
     "Zoom",
     "Other",
   ];
-  
+
+  useEffect(() => {
+    const getToken = async () => {
+      const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/csrf-token`, {
+        credentials: "include"
+      });
+      const data = await res.json();
+      setCsrfToken(data.csrfToken);
+    };
+
+    getToken();
+  }, []);
 
   // Fetch mentors from the database
   const fetchMentors = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`); // ✅ Fixed URL
+      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`,
+        {
+          withCredentials: true,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        }
+      ); // ✅ Fixed URL
       console.log("📥 MENTORS Response:", response.data); // ✅ Debugging Log
 
-      const formattedData = response.data.map((mentor) => ({
+      const formattedData = response.data.mentors.map((mentor) => ({
         id: mentor.mentor_id,
         mentor_firstName: mentor.mentor_firstName,
         mentor_lastName: mentor.mentor_lastName,
@@ -353,11 +372,15 @@ const Mentors = ( {} ) => {
 
     try {
       // You can POST this to your API
-      await fetch(`${process.env.REACT_APP_API_BASE_URL}/apply-as-mentor`, {
+      await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/apply-as-mentor`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, userId: user.id, email: user.email }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken, // Step 2: include CSRF token
+          'X-Requested-With': 'XMLHttpRequest',
+        },
         credentials: "include",  // ✅ this line ensures cookies/session are sent
+        body: JSON.stringify({ ...formData, userId: user.id, email: user.email }),
       });
 
       setSnackbar({

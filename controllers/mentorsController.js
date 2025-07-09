@@ -92,46 +92,38 @@ exports.getActiveMentors = async () => {
   }
 };
 
+// mentorModel.js
 exports.getAllMentors = async () => {
-  try {
-    const query = `
-      SELECT 
-        m.mentor_id,
-        m.mentor_firstName,
-        m.mentor_lastName,
-        m.email,
-        m.contactNum,
-        COUNT(ms.mentor_id) AS number_SE_assigned,
-        STRING_AGG(se.team_name, '||') AS assigned_se_names
-      FROM 
-        mentors m
-      LEFT JOIN 
-        mentorships ms ON ms.mentor_id = m.mentor_id
-      LEFT JOIN 
-        socialenterprises se ON se.se_id = ms.se_id
-      GROUP BY 
-        m.mentor_id, m.mentor_firstName, m.mentor_lastName, m.email, m.contactNum;
-    `;
+  const query = `
+    SELECT 
+      m.mentor_id,
+      m.mentor_firstName,
+      m.mentor_lastName,
+      m.email,
+      m.contactNum,
+      COUNT(ms.mentor_id) AS number_SE_assigned,
+      STRING_AGG(se.team_name, '||') AS assigned_se_names
+    FROM 
+      mentors m
+    LEFT JOIN 
+      mentorships ms ON ms.mentor_id = m.mentor_id
+    LEFT JOIN 
+      socialenterprises se ON se.se_id = ms.se_id
+    GROUP BY 
+      m.mentor_id, m.mentor_firstName, m.mentor_lastName, m.email, m.contactNum;
+  `;
 
-    const result = await pgDatabase.query(query);
+  const result = await pgDatabase.query(query);
 
-    if (!result.rows.length) {
-      return [];
-    }
-
-    return result.rows.map(mentor => ({
-      mentor_id: mentor.mentor_id,
-      mentor_firstName: mentor.mentor_firstname,
-      mentor_lastName: mentor.mentor_lastname,
-      email: mentor.email,
-      contactNum: mentor.contactnum,
-      number_SE_assigned: mentor.number_se_assigned || 0,
-      assigned_se_names: mentor.assigned_se_names || "", // Include the SE names here
-    }));
-  } catch (error) {
-    console.error("❌ Error fetching all mentors:", error);
-    return [];
-  }
+  return result.rows.map(mentor => ({
+    mentor_id: mentor.mentor_id,
+    mentor_firstName: mentor.mentorfirstname,
+    mentor_lastName: mentor.mentorlstname,
+    email: mentor.email,
+    contactNum: mentor.contactnum,
+    number_SE_assigned: mentor.number_se_assigned || 0,
+    assigned_se_names: mentor.assigned_se_names || "",
+  }));
 };
 
 exports.getAllMentorsWithMentorships = async () => {

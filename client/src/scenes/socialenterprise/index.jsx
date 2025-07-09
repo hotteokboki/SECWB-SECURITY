@@ -228,7 +228,14 @@ const SocialEnterprise = ({ }) => {
 
     const fetchMentors = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`); // Fetch mentors from API
+        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`, 
+          {
+            withCredentials: true,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          }
+        ); // Fetch mentors from API
         setMentors(response.data);
         console.log("mentorsdata", response.data);
       } catch (error) {

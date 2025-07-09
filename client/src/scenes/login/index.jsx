@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import "../../styles/Login.css";
 import { useAuth } from "../../context/authContext";
@@ -62,6 +62,9 @@ const Login = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success"); // or "error", "info", etc.
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+  const [retrySeconds, setRetrySeconds] = useState(null);
+  const [lockoutTime, setLockoutTime] = useState(0);
+  const retryTimerRef = useRef(null);
   const [menuOpenBusiness, setMenuOpenBusiness] = useState(false);
   const [menuOpenPreferredTime, setMenuOpenPreferredTime] = useState(false);
   const [menuOpenCommunicationModes, setMenuOpenCommunicationModes] = useState(false);
@@ -104,6 +107,34 @@ const Login = () => {
     e.stopPropagation();
     setMenuOpenPreferredTime(false);
   };
+  
+  const startRetryCountdown = (seconds) => {
+    setRetrySeconds(seconds);
+
+    if (retryTimerRef.current) {
+      clearInterval(retryTimerRef.current);
+    }
+
+    retryTimerRef.current = setInterval(() => {
+      setRetrySeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(retryTimerRef.current);
+          retryTimerRef.current = null;
+          setErrorMessage(""); 
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearInterval(retryTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleDoneCommunicationModes = (e) => {
     e.preventDefault();
@@ -127,7 +158,7 @@ const Login = () => {
           headers: {
             "Content-Type": "application/json",
           },
-          credentials: "include", // 🔥 this enables sending/receiving cookies
+          credentials: "include",
           body: JSON.stringify({
             email,
             password,
@@ -135,16 +166,27 @@ const Login = () => {
         }
       );
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.warn("Failed to parse JSON response:", parseError);
+      }
 
       if (response.ok) {
         login(data.user);
         window.location.href = data.redirect || "/dashboard";
       } else {
-        setErrorMessage(data.message || "Login failed");
+        if (response.status === 429 && data.retryAfter) {
+          setErrorMessage(data.message || "Too many login attempts.");
+          startRetryCountdown(data.retryAfter);
+        } else {
+          setErrorMessage(data.message || `Login failed. Status: ${response.status}`);
+        }
       }
     } catch (error) {
-      setErrorMessage("An error occurred. Please try again.");
+      console.error("Network or server error:", error);
+      setErrorMessage("A network error occurred. Please try again.");
     }
   };
 
@@ -327,6 +369,12 @@ const Login = () => {
                   </div>
                   {errorMessage && (
                     <div className="error-message">{errorMessage}</div>
+                  )}
+
+                  {retrySeconds !== null && (
+                    <div className="retry-message">
+                      Please wait {retrySeconds} second{retrySeconds !== 1 && 's'} before trying again.
+                    </div>
                   )}
                   <div className="separator">OR</div>
                   <div className="text sign-up-text">

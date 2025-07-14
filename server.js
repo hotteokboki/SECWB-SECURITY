@@ -25,7 +25,8 @@ const { getSocialEnterprisesByProgram,
         getFlaggedSEs,
         getAreasOfFocus,
         getSuggestedMentors,
-        getAcceptedApplications} = require("./controllers/socialenterprisesController");
+        getAcceptedApplications,
+        getSocialEnterpriseByMentorID} = require("./controllers/socialenterprisesController");
 require("dotenv").config();
 const { getUsers, getUserName, getLSEEDCoordinators, getLSEEDDirectors } = require("./controllers/usersController");
 const pgDatabase = require("./database.js"); // Import PostgreSQL client
@@ -1138,7 +1139,7 @@ app.post("/api/notify-mentor-application-status", async (req, res) => {
   }
 });
 
-app.post("/api/signup-lseed-coordinator", async (req, res) => {
+app.post("/signup-lseed-coordinator", async (req, res) => {
   const { firstName, lastName, email, contactno, password, token } = req.body;
 
   // Validate required fields
@@ -1513,7 +1514,7 @@ app.get("/api/dashboard-stats", async (req, res) => {
 });
 
 // Toggle mentor availability
-app.post("/toggle-mentor-availability", async (req, res) => {
+app.post("/api/toggle-mentor-availability", async (req, res) => {
   const { isAvailable } = req.body;
   const mentorID = req.session.user?.id;
 
@@ -1534,27 +1535,23 @@ app.post("/toggle-mentor-availability", async (req, res) => {
   }
 });
 
-app.get("/getAuditLogs", async (req, res) => {
+app.get("/api/get-audit-logs", async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
 
     const auditLogs = await getAuditLogs({ page, limit });
 
-
-
-    res.json(auditLogs);
+    res.status(200).json(auditLogs);
   } catch (error) {
     console.error("Error fetching audit logs:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.post("/invite-coordinator", async (req, res) => {
+app.post("/api/invite-coordinator", async (req, res) => {
   const { email } = req.body;
   const ipAddress = (req.headers['x-forwarded-for'] || req.connection.remoteAddress || '').split(',')[0].trim();
   const userId = req.session.user?.id;
-
-  console.log('POST /invite-coordinator - Inviting email:', email);
 
   if (!email) {
     return res.status(400).json({ message: 'Email is required.' });
@@ -1653,7 +1650,7 @@ app.get('/validate-invite-token', async (req, res) => {
 });
 
 // Returns mentor availability for mentorship
-app.get("/get-mentor-availability", async (req, res) => {
+app.get("/api/get-mentor-availability", async (req, res) => {
   const mentorId = req.session.user?.id;
 
   try {
@@ -1667,7 +1664,7 @@ app.get("/get-mentor-availability", async (req, res) => {
     }
 
     const isAvailable = result.rows[0].is_available_for_assignment;
-    res.json({ isAvailable });
+    res.status(200).json({ isAvailable });
   } catch (err) {
     console.error("Error fetching mentor availability:", err);
     res.status(500).json({ message: "Server error" });
@@ -1685,7 +1682,7 @@ app.get("/api/mentor-stats", async (req, res) => {
     const mostAssignedMentor = await getMostAssignedMentor();
     const totalSECount = await getTotalSECount();
 
-    res.json({
+    res.status(200).json({
       mentorCountTotal: mentorshipCount,
       mentorWithMentorshipCount: mentorsWithMentorshipCount,
       mentorWithoutMentorshipCount: mentorsWithoutMentorshipCount,
@@ -1706,7 +1703,7 @@ app.get("/api/pending-schedules", async (req, res) => {
 
     const result = await getPendingSchedules(program, mentorID);
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error fetching pending schedules:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -1719,20 +1716,20 @@ app.get("/api/flagged-ses", async (req, res) => {
 
     const result = await getFlaggedSEs(program);
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error fetching pending schedules:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.get("/ack-data", async (req, res) => {
+app.get("/api/ack-data", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
     const result = await getAcknowledgementData(program);
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error fetching pending schedules:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -1745,7 +1742,7 @@ app.get("/api/evaluation-stats", async (req, res) => {
 
     const result = await getAllEvaluationStats(program);
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("❌ Error fetching pending schedules:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -1777,7 +1774,7 @@ app.get("/api/analytics-stats", async (req, res) => {
     const leaderboardData = await getSELeaderboards(program);
 
     // ✅ Return Response
-    res.json({
+    res.status(200).json({
       totalSocialEnterprises: parseInt(totalSocialEnterprises[0].count),
       previousMonthSECount: parseInt(previousTotalSocialEnterprises[0].count),
       withMentorship: currentWithMentorshipCount,
@@ -1796,7 +1793,7 @@ app.get("/api/analytics-stats", async (req, res) => {
   }
 });
 
-app.get("/fetch-mentor-dashboard-stats", async (req, res) => {
+app.get("/api/fetch-mentor-dashboard-stats", async (req, res) => {
   try {
     const mentorID = req.session.user?.id;
 
@@ -1807,7 +1804,7 @@ app.get("/fetch-mentor-dashboard-stats", async (req, res) => {
     const mentorshipsCount = await getMentorshipCountByMentorID(mentorID);
 
     // ✅ Return Response
-    res.json({
+    res.status(200).json({
       totalEvalMade,
       avgRatingGiven,
       mostCommonRating,
@@ -1820,94 +1817,22 @@ app.get("/fetch-mentor-dashboard-stats", async (req, res) => {
   }
 });
 
-app.post("/api/mentors", async (req, res) => {
-  try {
-    const { mentor_id, mentor_firstName, mentor_lastName, email, contactNum } = req.body;
-
-    await pgDatabase.query(
-      `INSERT INTO mentors ("mentor_id", "mentor_firstName", "mentor_lastName", "email", "contactNum", "number_SE_assigned") 
-       VALUES ($1, $2, $3, $4, $5, 0)`,
-      [mentor_id, mentor_firstName, mentor_lastName, email, contactNum]
-    );
-
-    res.status(201).json({ message: "Mentor added successfully" });
-  } catch (error) {
-    console.error("Error adding mentor:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
-app.put("/api/mentors/:id", async (req, res) => {
-  const { id } = req.params;
-  const updatedMentor = req.body;
-
-  // console.log(" [server] Received update request for Mentor ID:", id);
-
-  try {
-    // console.log(" [mentors/id] Updating Mentor ID:", id, "\n");
-    const result = await updateMentor(id, updatedMentor);
-    
-    if (result.rowCount === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const updatedRow = result.rows[0];
-    // console.log(" [mentors/id] Mentor Updated!", updatedRow, "\n");
-    res.json({ 
-      message: "Mentor updated successfully", 
-      user: { ...updatedRow, id: updatedRow.mentor_id } // ✅ Ensure frontend receives correct data
-    });
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
 app.get("/api/mentors/:mentorId/social-enterprises", async (req, res) => {
   const { mentorId } = req.params;
 
   try {
-    const query = `
-      SELECT se.se_id, se.team_name
-      FROM socialenterprises se
-      JOIN mentorships m ON se.se_id = m.se_id
-      WHERE m.mentor_id = $1
-    `;
-    const result = await pgDatabase.query(query, [mentorId]);
+    const result = await getSocialEnterpriseByMentorID(mentorId)
 
-    res.json(result.rows);
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching social enterprises:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-async function updateMentor(id, updatedMentor) {
-  const { mentor_firstName, mentor_lastName, email, contactnum, isactive } = updatedMentor; // Modify based on your schema
-  // console.log(" [updateMentor] Processing:", id, "\n");
-  const query = `
-    UPDATE users
-    SET first_name = $1, last_name = $2, email = $3, contactnum = $4, isactive = $5
-    WHERE user_id = $6
-    RETURNING *;
-  `;
-
-  const values = [mentor_firstName, mentor_lastName, email, contactnum, isactive, id];
-
-  try {
-    const result = await pgDatabase.query(query, values);
-    console.log("✅ Update Complete ", id);
-    return result;
-  } catch (error) {
-    console.error("Database update error:", error);
-    throw error;
-  }
-}
-
-
 //API for evaluation
 
-app.post("/evaluate", async (req, res) => {
+app.post("/api/evaluate", async (req, res) => {
   try {
     console.log("📥 Received Evaluation Data:", req.body);
 
@@ -2021,7 +1946,7 @@ app.post("/evaluate", async (req, res) => {
   }
 });
 
-app.post("/evaluate-mentor", async (req, res) => {
+app.post("/api/evaluate-mentor", async (req, res) => {
   try {
     let { programs } = req.body;
 
@@ -2071,18 +1996,13 @@ app.post("/evaluate-mentor", async (req, res) => {
   }
 });
 
-// Example of a protected route
-app.get("/protected", requireAuth, (req, res) => {
-  res.json({ message: "Access granted to protected route" });
-});
-
 // Route to get all mentorship schedules
-app.get("/api/mentorSchedules", async (req, res) => {
+app.get("/api/get-mentor-schedules", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
     const schedules = await getSchedulingHistory(program);
-    res.json(schedules);
+    res.status(200).json(schedules);
   } catch (error) {
     console.error("❌ Error fetching mentor schedules:", error);
     res.status(500).json({ error: "Failed to fetch mentor schedules" });
@@ -2095,7 +2015,7 @@ app.get("/api/admin/users", async (req, res) => {
     if (!users || users.length === 0) {
       return res.status(404).json({ message: "No users found" });
     }
-    res.json(users);
+    res.status(200).json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2124,7 +2044,7 @@ app.get('/api/check-mentor-application-status', async (req, res) => {
       allowed = !(status === 'Pending' || status === 'Approved');
     }
 
-    return res.json({ allowed });
+    return res.status(200).json({ allowed });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -2192,7 +2112,7 @@ app.get("/api/get-program-coordinator", async (req, res) => {
       return res.status(404).json({ message: "No programs found for this user" });
     }
 
-    res.json(programCoordinators);
+    res.status(200).json(programCoordinators);
   } catch (error) {
     console.error("Error fetching program coordinator:", error);
     res.status(500).json({ message: "Internal Server Error" });

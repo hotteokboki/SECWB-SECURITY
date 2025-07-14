@@ -19,6 +19,7 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { tokens } from "../../theme";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/authContext";
+import axiosClient from "../../api/axiosClient";
 
 const Analytics = ( {}) => {
   const theme = useTheme();
@@ -40,17 +41,16 @@ const Analytics = ( {}) => {
           const data = await res.json();
           const program = data[0]?.name;
 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/analytics-stats?program=${program}`
+          response = await axiosClient(
+            `/api/analytics-stats?program=${program}`
           );
         } else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/analytics-stats`
+          response = await axiosClient(
+            `/api/analytics-stats`
           );
         }
-        const data = await response.json();
-
-        setStats(data);
+        
+        setStats(response.data);
       } catch (error) {
         console.error("Error fetching analytics stats:", error);
         setStats({ heatmapStats: [] }); // Fallback to empty array

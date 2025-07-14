@@ -269,7 +269,16 @@ exports.getAllSocialEnterprisesWithMentorship = async (program = null) => {
   }
 };
 
-
+exports.getSocialEnterpriseByMentorID = async (mentor_id) => {
+  const query = `
+    SELECT se.se_id, se.team_name
+    FROM socialenterprises se
+    JOIN mentorships m ON se.se_id = m.se_id
+    WHERE m.mentor_id = $1
+  `;
+  const result = await pgDatabase.query(query, [mentor_id]);
+  return result.rows;
+};
 
 exports.getSocialEnterprisesWithoutMentor = async () => {
   try {

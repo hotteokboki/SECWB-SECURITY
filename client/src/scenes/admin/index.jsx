@@ -12,6 +12,7 @@ import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import { DataGrid } from "@mui/x-data-grid";
 import { Snackbar, Alert, Dialog, DialogTitle, DialogContent, TextField, DialogActions } from "@mui/material";
+import axiosClient from "../../api/axiosClient";
 
 const AdminPage = () => {
   const [users, setUsers] = useState([]);
@@ -38,12 +39,9 @@ const AdminPage = () => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/admin/users`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch users");
-        }
-        const data = await response.json();
-        setUsers(data);
+        const response = await axiosClient(`/api/admin/users`);
+        
+        setUsers(response.data);
       } catch (err) {
         setError(err.message || "An error occurred while fetching users.");
       } finally {
@@ -94,11 +92,10 @@ const AdminPage = () => {
         return;
       }
 
-      // Send the invite request
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_BASE_URL}/invite-coordinator`,
-          {email: inviteCoordinatorFormData.email.trim()}, 
-          { withCredentials: true }
+        // Send the invite request
+        const response = await axiosClient.post(`/api/invite-coordinator`,{
+          email: inviteCoordinatorFormData.email.trim()
+        }, 
       );
 
       if (response.status === 201) {

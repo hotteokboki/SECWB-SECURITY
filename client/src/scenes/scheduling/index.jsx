@@ -41,6 +41,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { saveAs } from "file-saver";
 import { preventDefault } from "@fullcalendar/core/internal";
+import axiosClient from "../../api/axiosClient";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -379,13 +380,13 @@ const Scheduling = ({}) => {
               }
             );
             const program = programRes.data[0]?.name;
-            lseedResponse = await axios.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/mentorSchedules`,
+            lseedResponse = await axiosClient.get(
+              `/api/get-mentor-schedules`,
               { params: { program } }
             );
           } else {
-            lseedResponse = await axios.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/mentorSchedules`
+            lseedResponse = await axiosClient.get(
+              `/api/get-mentor-schedules`
             );
           }
           setLseedHistory(lseedResponse.data || []);
@@ -726,16 +727,15 @@ const Scheduling = ({}) => {
 
           const program = res.data[0]?.name;
 
-          response = await axios.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/pending-schedules`,
-            { params: { program }, withCredentials: true }
-          );
+          response = await axiosClient.get(`/api/pending-schedules`,{ 
+            params: { program },
+          });
         } else {
-          response = await axios.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/pending-schedules`
+          response = await axiosClient.get(
+            `/api/pending-schedules`
           );
         }
-        const data = response.data; // no need for .json() when using axios
+        const data = response.data; 
 
         console.log("📅 Mentor Schedules Data:", data); // ✅ Debugging log
 

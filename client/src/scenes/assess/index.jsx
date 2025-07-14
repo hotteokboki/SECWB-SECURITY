@@ -20,6 +20,7 @@ import { tokens } from "../../theme";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import Header from "../../components/Header";
 import { useAuth } from "../../context/authContext";
+import axiosClient from "../../api/axiosClient";
 
 const EvaluatePage = ({ }) => {
   const theme = useTheme();
@@ -70,7 +71,7 @@ const EvaluatePage = ({ }) => {
     try {
       console.log("📤 Submitting evaluations for programs:", selectedPrograms);
 
-      await axios.post(`${process.env.REACT_APP_API_BASE_URL}/evaluate-mentor`, {
+      await axiosClient.post(`/api/evaluate-mentor`, {
         programs: selectedPrograms, // Send selected program IDs
       });
 
@@ -673,7 +674,7 @@ const EvaluatePage = ({ }) => {
     console.log("📤 Sending Evaluation to Backend:", formData);
 
     try {
-      await axios.post(`${process.env.REACT_APP_API_BASE_URL}/evaluate`, formData);
+      await axiosClient.post(`/api/evaluate`, formData);
 
       if (currentSEIndex < selectedSEs.length - 1) {
         setCurrentSEIndex((prevIndex) => prevIndex + 1); // Move to the next SE

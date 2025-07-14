@@ -3,6 +3,7 @@ import { Box, Typography, useTheme, Snackbar, Alert } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import Header from "../../components/Header";
 import { tokens } from "../../theme";
+import axiosClient from "../../api/axiosClient";
 
 const AuditLogsPage = () => {
     const theme = useTheme();
@@ -14,28 +15,24 @@ const AuditLogsPage = () => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
 
     useEffect(() => {
-    const fetchLogs = async () => {
-        try {
-        setLoading(true);
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/getAuditLogs`);
-        if (!response.ok) {
-            throw new Error("Failed to fetch audit logs.");
-        }
-        const data = await response.json();
-        setLogs(data.logs); // ✅ THIS FIX
+        const fetchLogs = async () => {
+            try {
+            setLoading(true);
+            const response = await axiosClient(`/api/get-audit-logs`);
+            const data = response.data;
+            setLogs(data.logs);
+            console.log(data.logs);
+            } catch (err) {
+            console.error(err);
+            setError(err.message || "An error occurred while fetching logs.");
+            setSnackbarOpen(true);
+            } finally {
+            setLoading(false);
+            }
+        };
 
-        console.log(data.logs)
-        } catch (err) {
-        console.error(err);
-        setError(err.message || "An error occurred while fetching logs.");
-        setSnackbarOpen(true);
-        } finally {
-        setLoading(false);
-        }
-    };
-
-    fetchLogs();
-    }, []);
+        fetchLogs(); 
+    }, []); 
 
     const columns = [
         {

@@ -13,6 +13,7 @@ import TrafficIcon from "@mui/icons-material/Traffic";
 import HeatmapWrapper from "../../components/MyHeatMap";
 import { tokens } from "../../theme";
 import { useEffect, useState } from "react";
+import axiosClient from "../../api/axiosClient";
 
 const MentorshipAnalytics = () => {
   const theme = useTheme();
@@ -22,10 +23,10 @@ const MentorshipAnalytics = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/analytics-stats`
+        const response = await axiosClient(
+          `/api/analytics-stats`
         );
-        const data = await response.json();
+        const data = response.data;
 
         // Validate data structure
         if (!data?.heatmapStats || !Array.isArray(data.heatmapStats)) {

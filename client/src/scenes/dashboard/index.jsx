@@ -40,6 +40,7 @@ import {
   EventAvailable,
 } from "@mui/icons-material";
 import axios from "axios";
+import axiosClient from "../../api/axiosClient";
 
 const Dashboard = ({ }) => {
   const theme = useTheme();
@@ -88,9 +89,7 @@ const Dashboard = ({ }) => {
     const fetchMentorDashboardStats = async () => {
       try {
 
-        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/fetch-mentor-dashboard-stats`, {
-          withCredentials: true,
-        });
+        const response = await axiosClient.get(`/api/fetch-mentor-dashboard-stats`);
 
         const data = response.data; 
 
@@ -520,51 +519,6 @@ const Dashboard = ({ }) => {
     },
   ];
 
-  // If will double check if this is for LSEED only
-  //   useEffect(() => {
-  //   const fetchFlaggedSE = async () => {
-  //     try {
-  //       let response;
-        
-  //       // ✅ REVISED: Check both the user's role AND the active view
-  //       if (isCoordinatorView && user?.roles?.some(role => role?.startsWith("LSEED"))) {
-  //         const res = await fetch("http://localhost:4000/api/get-program-coordinator", {
-  //           method: "GET",
-  //           credentials: "include",
-  //         });
-  //         const data = await res.json();
-  //         const program = data[0]?.name;
-
-  //         response = await fetch(
-  //           `http://localhost:4000/api/flagged-ses?program=${program}`
-  //         );
-  //         const data = await response.json();
-  //         if (Array.isArray(data)) {
-  //           const formattedSEs = data.map((se) => ({
-  //             id: se.se_id,
-  //             seName: se.team_name,
-  //             averageScore: se.avg_rating || 0,
-  //             lastEvaluated: se.evaluation_status,
-  //           }));
-  //           setLowPerformingSEs(formattedSEs);
-  //         } else {
-  //           console.error("❌ Invalid mentor schedule format:", data);
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error("❌ Error fetching mentor schedules:", error);
-  //       setLowPerformingSEs([]);
-  //     }
-  //   };
-    
-  //   // ✅ Add isCoordinatorView to the dependency array
-  //   if (user) {
-  //       fetchFlaggedSE();
-  //   }
-  // }, [user, isCoordinatorView]); // ✅ Add isCoordinatorView here
-
-  //DEBUG::
-
   useEffect(() => {
     const fetchFlaggedSE = async () => {
       try {
@@ -578,15 +532,15 @@ const Dashboard = ({ }) => {
           const data = await res.json();
           const program = data[0]?.name;
 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/flagged-ses?program=${program}`
+          response = await axiosClient(
+            `/api/flagged-ses?program=${program}`
           );
         } else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/flagged-ses`
+          response = await axiosClient(
+            `/api/flagged-ses`
           );
         }
-        const data = await response.json(); // No need for .json() with axios
+        const data = response.data; 
 
         if (Array.isArray(data)) {
           const formattedSEs = data.map((se) => ({
@@ -623,16 +577,12 @@ const Dashboard = ({ }) => {
           const data = await res.json();
           const program = data[0]?.name;
 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/pending-schedules?program=${program}`
-          );
+          response = await axiosClient(`/api/pending-schedules?program=${program}`);
         }
         else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/pending-schedules`
-          );
+          response = await axiosClient(`/api/pending-schedules`);
         }
-        const data = await response.json();
+        const data = response.data;
 
         console.log("📅 Mentor Schedules Data:", data); // ✅ Debugging log
 
@@ -740,19 +690,19 @@ const Dashboard = ({ }) => {
             credentials: "include", // Required to send session cookie
           });
 
-          const data = await res.json();
-          const program = data[0]?.name;
+          const dataJSON = await res.json();
+          const program = dataJSON[0]?.name;
 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/evaluation-stats?program=${program}`
+          response = await axiosClient(
+            `/api/evaluation-stats?program=${program}`
           );
         }
         else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/evaluation-stats`
+          response = await axiosClient(
+            `/api/evaluation-stats`
           );
         }
-        const data = await response.json();
+        const data = response.data;
 
         console.log("Evaluation Stats Data:", data); // Log API response
         setEvaluations({

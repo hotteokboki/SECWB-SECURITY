@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { tokens } from "../theme";
 import { useAuth } from "../context/authContext";
+import axiosClient from "../api/axiosClient";
 
 const AcknowledgmentChart = ({}) => {
   const [ackData, setAckData] = useState([]);
@@ -36,13 +37,13 @@ const AcknowledgmentChart = ({}) => {
             throw new Error("No program found for this coordinator");
           }
 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/ack-data?program=${program}`
+          response = await axiosClient(
+            `/api/ack-data?program=${program}`
           );
         }
         else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/ack-data`
+          response = await axiosClient(
+            `/api/ack-data`
           );
         }
 

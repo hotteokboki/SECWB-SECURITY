@@ -652,7 +652,7 @@ app.get('/get-csrf-token', csrfProtection, (req, res) => {
   res.cookie('XSRF-TOKEN', token);
   res.json({ csrfToken: token });
 });
-
+// SUBA
 app.post("/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
@@ -2050,7 +2050,7 @@ app.get('/api/check-mentor-application-status', async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
-
+// SUBA
 app.get("/api/get-programs", async (req, res) => {
   try {
     const programCoordinators = await getProgramCoordinators(); // Fetch users from DB
@@ -2738,7 +2738,7 @@ app.get("/getMentorshipsbyID", async (req, res) => {
       return res.status(404).json({ message: "No mentorships found for the given mentor_id" });
     }
 
-    res.json(mentorships); // Send the mentorships data
+    res.status(200).json(mentorships); // Send the mentorships data
   } catch (error) {
     console.error("Error fetching mentorships:", error);
     res.status(500).json({ message: "Internal Server Error" });

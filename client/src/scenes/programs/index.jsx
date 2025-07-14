@@ -21,6 +21,7 @@ import {
   DialogActions,
   Grid,
 } from "@mui/material";
+import axiosClient from "../../api/axiosClient";
 
 const ProgramPage = () => {
   const [programs, setPrograms] = useState([]);
@@ -69,12 +70,11 @@ const ProgramPage = () => {
 
         console.log(mappedPrograms);
 
-        const lseedCoordinatorsResponse = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/get-lseed-coordinators`
+        const lseedCoordinatorsResponse = await axiosClient.get(
+          `/api/get-lseed-coordinators`
         );
-        if (!lseedCoordinatorsResponse.ok)
-          throw new Error("Failed to fetch LSEED coordinators");
-        const lseedCoordinatorsData = await lseedCoordinatorsResponse.json();
+
+        const lseedCoordinatorsData = lseedCoordinatorsResponse.data;
         setAvailableLSEEDCoordinators(lseedCoordinatorsData);
       } catch (error) {
         setSnackbarMessage(error.message || "Error fetching data");

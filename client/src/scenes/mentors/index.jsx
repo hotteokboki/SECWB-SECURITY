@@ -36,6 +36,7 @@ import { Snackbar, Alert } from "@mui/material";
 import Tooltip from "@mui/material/Tooltip";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useAuth } from "../../context/authContext";
+import axiosClient from '../../api/axiosClient.js';
 
 const Mentors = ( {} ) => {
   const theme = useTheme();
@@ -47,7 +48,6 @@ const Mentors = ( {} ) => {
     selectedMentor: "",
     selectedSocialEnterprise: "",
   });
-  const [csrfToken, setCsrfToken] = useState('');
   const [menuOpenBusiness, setMenuOpenBusiness] = useState(false);
   const [menuOpenPreferredTime, setMenuOpenPreferredTime] = useState(false);
   const [menuOpenCommunicationModes, setMenuOpenCommunicationModes] = useState(false);
@@ -66,26 +66,14 @@ const Mentors = ( {} ) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuRowId, setMenuRowId] = useState(null); 
   const [mentorApplications, setMentorApplications] = useState([]);
-  const [mentorApplicationData, setMentorApplicationData] = useState({
-    name: "",
-    selectedSDG: "",
-    contact: "",
-    numberOfMembers: "",
-    selectedProgram: "",
-    selectedStatus: "",
-    abbr: "", 
-    criticalAreas: [],
-  });
   const [suggestedMentors, setSuggestedMentors] = useState([]);
   const [otherMentors, setOtherMentors] = useState([]);
-  const [openAddMentor, setOpenAddMentor] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [openApplicationDialog, setOpenApplicationDialog] = useState(false);
   const [loading, setLoading] = useState(true); // Loading state for API call
   const [mentors, setMentors] = useState([]);
   const [socialEnterprises, setSocialEnterprises] = useState([]);
   const [stats, setStats] = useState(null);
-  const [selectedRowId, setSelectedRowId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAllowedtoApply, setIsAllowedtoApply] = useState(null);
   const [selectedMentor, setSelectedMentor] = useState(null);
@@ -99,8 +87,6 @@ const Mentors = ( {} ) => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
-  const hasMentorRole = user?.roles?.includes("Mentor");
-  const isLSEEDCoordinator = user?.roles?.includes("LSEED-Coordinator");
   
   const businessAreasList = [
     "Application Development",
@@ -136,32 +122,13 @@ const Mentors = ( {} ) => {
     "Other",
   ];
 
-  useEffect(() => {
-    const getToken = async () => {
-      const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/csrf-token`, {
-        credentials: "include"
-      });
-      const data = await res.json();
-      setCsrfToken(data.csrfToken);
-    };
-
-    getToken();
-  }, []);
-
   // Fetch mentors from the database
   const fetchMentors = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`,
-        {
-          withCredentials: true,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        }
-      ); // ✅ Fixed URL
+      const response = await axiosClient.get(`/api/mentors`); 
       console.log("📥 MENTORS Response:", response.data); // ✅ Debugging Log
 
-      const formattedData = response.data.mentors.map((mentor) => ({
+      const formattedData = response.data.map((mentor) => ({
         id: mentor.mentor_id,
         mentor_firstName: mentor.mentor_firstName,
         mentor_lastName: mentor.mentor_lastName,
@@ -372,15 +339,10 @@ const Mentors = ( {} ) => {
 
     try {
       // You can POST this to your API
-      await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/apply-as-mentor`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken, // Step 2: include CSRF token
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: "include",  // ✅ this line ensures cookies/session are sent
-        body: JSON.stringify({ ...formData, userId: user.id, email: user.email }),
+      await axiosClient.post('/api/apply-as-mentor', {
+        ...formData,
+        userId: user.id,
+        email: user.email
       });
 
       setSnackbar({
@@ -420,16 +382,15 @@ const Mentors = ( {} ) => {
   };
 
   const handleAcceptMentor = async (row) => {
-    const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/accept-mentor-application`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicationId: row.id }),
-    });
+    try {
+      const res = await axiosClient.post('/api/accept-mentor-application', {
+        applicationId: row.id
+      });
 
-    if (!res.ok) throw new Error("Failed to accept mentor application");
-
-    const data = await res.json();
-    console.log("✅ Mentor accepted:", data);
+      console.log("✅ Mentor accepted:", res.data);
+    } catch (error) {
+      console.error("❌ Failed to accept mentor application:", error);
+    }
   };
 
   const handleMenuAction = async (action, row) => {
@@ -458,28 +419,14 @@ const Mentors = ( {} ) => {
 
       try {
         // 1️⃣ Update application status in DB
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/mentor-application/${applicationId}/status`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: "Declined" }),
+        await axiosClient.put(`/api/mentor-application/${applicationId}/status`, {
+          status: "Declined"
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to update status in database");
-        }
-
         // 2️⃣ Notify the applicant by email
-        await fetch(`${process.env.REACT_APP_API_BASE_URL}/notify-mentor-application-status`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            applicationId,
-            status: "Declined",
-          }),
+        await axiosClient.post('/api/notify-mentor-application-status', {
+          applicationId,
+          status: "Declined"
         });
 
         // 3️⃣ Show success message
@@ -511,18 +458,22 @@ const Mentors = ( {} ) => {
 
   useEffect(() => {
     const fetchMentorApplicationStatus = async () => {
-      const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/check-mentor-application-status`, { credentials: 'include' });
-      const data = await res.json();
-      setIsAllowedtoApply(data.allowed);
+      try {
+        const res = await axiosClient.get('/api/check-mentor-application-status');
+        setIsAllowedtoApply(res.data.allowed);
+      } catch (error) {
+        console.error('Error fetching mentor application status:', error);
+      }
     };
+
     fetchMentorApplicationStatus();
   }, []);
 
   useEffect(() => {
     const fetchMentorApplications = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/list-mentor-applications`); // adjust endpoint as needed
-        const data = await response.json()
+        const response = await axiosClient.get(`/api/list-mentor-applications`); // adjust endpoint as needed
+        const data = response.data
 
         console.log("Raw date_applied:", data[0]?.date_applied);
 
@@ -555,18 +506,9 @@ const Mentors = ( {} ) => {
   // Function to fetch assigned social enterprises
   const fetchSocialEnterprises = async (mentorId) => {
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/api/mentors/${mentorId}/social-enterprises`
-      );
+      const response = await axiosClient.get(`/api/mentors/${mentorId}/social-enterprises`);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json(); // ✅ Ensure response is parsed as JSON
-      setSocialEnterprises(data);
-      console.log("📥 Social Enterprises Data:", data);
-      return data;
+      setSocialEnterprises(response.data);
     } catch (error) {
       console.error("Error fetching social enterprises:", error);
     }
@@ -575,10 +517,9 @@ const Mentors = ( {} ) => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/mentor-stats`);
+        const response = await axiosClient.get(`/api/mentor-stats`);
         
-        const data = await response.json();
-        setStats(data);
+        setStats(response.data);
       } catch (error) {
         console.error("Error fetching analytics stats:", error);
       }
@@ -589,20 +530,14 @@ const Mentors = ( {} ) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch active mentors
-        const mentorsResponse = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/mentors-with-mentorships`
-        );
-        const mentorsData = await mentorsResponse.json();
-        setMentors(mentorsData);
+        // ✅ Fetch active mentors
+        const mentorsResponse = await axiosClient.get('/api/mentors-with-mentorships');
+        setMentors(mentorsResponse.data);
 
-        // Fetch social enterprises without mentors
-        const seResponse = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/social-enterprises-without-mentor`
-        );
-        const seData = await seResponse.json();
+        // ✅ Fetch social enterprises without mentors
+        const seResponse = await axiosClient.get('/api/social-enterprises-without-mentor');
         setSocialEnterprises(
-          seData.map((se) => ({
+          seResponse.data.map((se) => ({
             id: se.se_id,
             name: se.team_name,
           }))
@@ -611,8 +546,10 @@ const Mentors = ( {} ) => {
         console.error("Error fetching data:", error);
       }
     };
+
     fetchData();
   }, []);
+
   // State for dialogs and data
   const [openDialog, setOpenDialog] = useState(false);
   const [openRelatedSEs, setOpenRelatedSEs] = useState(false);
@@ -659,19 +596,11 @@ const Mentors = ( {} ) => {
 
   const matchMentors = async (selectedSeId) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/suggested-mentors`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ se_id: selectedSeId }),
+      const response = await axiosClient.post('/api/suggested-mentors', {
+        se_id: selectedSeId
       });
 
-      const data = await response.json();
-
-      console.log("✅ Raw mentor match response:", data);
-      console.log("👉 Suggested mentors:", data.suggested);
-      console.log("👉 Other mentors:", data.others);
+      const data = response.data;
 
       setSuggestedMentors(data.suggested || []);
       setOtherMentors(data.others || []);
@@ -687,42 +616,33 @@ const Mentors = ( {} ) => {
       alert("Please select a mentor and a social enterprise.");
       return;
     }
-    console.log("mentorId: ", selectedMentor.mentor_id, " seId: ", selectedSE);
+    
+    console.log("mentorId:", selectedMentor.mentor_id, "seId:", selectedSE);
+
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/api/remove-mentorship`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mentorId: selectedMentor.mentor_id,
-            seId: selectedSE,
-          }),
-        }
-      );
+      await axiosClient.post('/api/remove-mentorship', {
+        mentorId: selectedMentor.mentor_id,
+        seId: selectedSE
+      });
 
-      if (response.ok) {
-        // Show success message
-        setSnackbarMessage("Successfully Removed!");
-        setSnackbarSeverity("success");
-        setSnackbarOpen(true); // Ensure setSnackbarOpen is defined
+      // Show success message
+      setSnackbarMessage("Successfully Removed!");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
 
-        await new Promise((r) => setTimeout(r, 1500));
-        window.location.reload();
+      await new Promise((r) => setTimeout(r, 1500));
+      window.location.reload();
 
-        setIsModalOpen(false);
-        setSelectedMentor(null);
-        setSelectedSE("");
-        fetchMentors(); // Refresh mentor list
-      } else {
-        alert("Failed to remove mentorship.");
-      }
+      setIsModalOpen(false);
+      setSelectedMentor(null);
+      setSelectedSE("");
+      fetchMentors();
     } catch (error) {
       console.error("Error removing mentorship:", error);
+      alert("Failed to remove mentorship.");
     }
   };
 
-  // Submit new mentor data
   const handleSubmit = async () => {
     const { selectedMentor, selectedSocialEnterprise } = mentorshipData;
 
@@ -732,55 +652,46 @@ const Mentors = ( {} ) => {
     }
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/mentorships`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mentor_id: selectedMentor,
-          se_id: selectedSocialEnterprise,
-        }),
+      const response = await axiosClient.post('/api/mentorships', {
+        mentor_id: selectedMentor,
+        se_id: selectedSocialEnterprise
       });
 
-      if (response.ok) {
-        console.log("Mentorship added successfully");
+      console.log("Mentorship added successfully:", response.data);
 
-        // Close the dialog box
-        setOpenDialog(false);
+      // Close the dialog box
+      setOpenDialog(false);
 
-        // Reset the form data
-        setMentorshipData({ selectedMentor: "", selectedSocialEnterprise: "" });
+      // Reset the form data
+      setMentorshipData({ selectedMentor: "", selectedSocialEnterprise: "" });
 
-        // Show success popup
-        setSnackbarMessage("Mentorship added successfully!");
-        setSnackbarSeverity("success");
-        setSnackbarOpen(true); // Ensure setSnackbarOpen is defined
+      // Show success popup
+      setSnackbarMessage("Mentorship added successfully!");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true); // Ensure setSnackbarOpen is defined
 
-        // Fetch latest data
-        await fetchLatestMentorships();
+      // Fetch latest data
+      await fetchLatestMentorships();
 
-        // Refresh the page after a short delay to ensure updates are reflected
-        await new Promise((r) => setTimeout(r, 1000));
-        window.location.reload();
-      } else {
-        console.error("Error adding mentorship");
-      }
+      // Refresh the page after a short delay to ensure updates are reflected
+      await new Promise((r) => setTimeout(r, 1000));
+      window.location.reload();
+      
     } catch (error) {
-      console.error("Failed to add mentorship:", error);
+      console.error("❌ Failed to add mentorship:", error);
     }
   };
 
   const fetchLatestMentorships = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/mentorships`); // Adjust the endpoint as needed
-      if (response.ok) {
-        const updatedMentorships = await response.json();
-        // Update the state with the latest mentorship data
-        setMentorships(updatedMentorships); // Assuming you have a state variable `mentorships`
-      } else {
-        console.error("Failed to fetch latest mentorships");
-      }
+      const response = await axiosClient.post(`/api/mentorships`); // Assuming POST is correct
+
+      const updatedMentorships = response.data;
+
+      // Update the state with the latest mentorship data
+      setMentorships(updatedMentorships);
     } catch (error) {
-      console.error("Error fetching mentorships:", error);
+      console.error("❌ Error fetching mentorships:", error);
     }
   };
 

@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from "react";
 import { Box } from "@mui/material";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthContextProvider, useAuth } from "./context/authContext";
-import ScrollToTop from "./components/ScrollToTop";
 import Login from "./scenes/login";
 import Dashboard from "./scenes/dashboard";
 import SocialEnterprise from "./scenes/socialenterprise";
@@ -16,16 +14,12 @@ import EvaluatePage from "./scenes/assess";
 import SEAnalytics from "./scenes/seanalytics";
 import MentorAnalytics from "./scenes/mentoranalytics";
 import Mentorships from "./scenes/mentorships";
-import Sidebar from "./scenes/global/Sidebar";
-import Topbar from "./scenes/global/Topbar";
 import AuditLogs from "./scenes/audit-logs";
 import Unauthorized from "./scenes/unauthorized";
 import ProfilePage from "./scenes/profile";
 import { ColorModeContext, useMode } from "./theme";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import MentorshipAnalytics from "./scenes/analytics-mentorship";
-import MentorDashboard from "./scenes/mentordashboard";
 import CoordinatorSignup from "./scenes/coordinator-signup";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import ForgotPassword from "./scenes/forgotpassword";
@@ -33,6 +27,7 @@ import ResetPassword from "./scenes/resetpassword";
 import FinancialAnalytics from "./scenes/financial-analytics";
 import PublicLayout from "./layouts/PublicLayout";
 import AppLayout from "./layouts/AppLayout";
+import { CsrfProvider } from "./context/CsrfContext.js";
 
 const App = () => {
   const [theme, colorMode] = useMode();
@@ -40,14 +35,16 @@ const App = () => {
   return (
     <GoogleOAuthProvider clientId="1025918978584-niisk93pun37oujtrjdkpra1cn1b8esv.apps.googleusercontent.com">
       <AuthContextProvider>
-        <ColorModeContext.Provider value={colorMode}>
-          <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <Box sx={{ display: "flex", minHeight: "100vh" }}>
-              <MainContent />
-            </Box>
-          </ThemeProvider>
-        </ColorModeContext.Provider>
+        <CsrfProvider>
+            <ColorModeContext.Provider value={colorMode}>
+              <ThemeProvider theme={theme}>
+                <CssBaseline />
+                <Box sx={{ display: "flex", minHeight: "100vh" }}>
+                  <MainContent />
+                </Box>
+              </ThemeProvider>
+            </ColorModeContext.Provider>
+          </CsrfProvider>
       </AuthContextProvider>
     </GoogleOAuthProvider>
   );

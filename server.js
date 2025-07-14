@@ -176,6 +176,31 @@ app.use("/api/", apiLimiter);
 
 const csrfProtection = csrf({ cookie: true });
 
+const isAuthenticated = (req, res, next) => {
+  if (req.session && req.session.isAuth && req.session.user) {
+    return next();
+  }
+  return res.status(401).json({ message: "Unauthorized. Please log in first." });
+};
+
+const isAjaxRequest = (req, res, next) => {
+  if (req.get('X-Requested-With') === 'XMLHttpRequest') {
+    return next();
+  }
+  return res.status(403).json({ message: "Forbidden: direct access not allowed" });
+};
+
+// First check auth and AJAX for /api
+app.use('/api', isAuthenticated, isAjaxRequest);
+
+app.use('/api', (req, res, next) => {
+  const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+  if (unsafeMethods.includes(req.method)) {
+    return csrfProtection(req, res, next);
+  }
+  next();
+});
+
 // API Routes
 //TODO
 app.use("/api/cashflow", cashflowRoutes);
@@ -254,20 +279,6 @@ console.log("First row preview:", data[0]);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
-const isAuthenticated = (req, res, next) => {
-  if (req.session && req.session.isAuth && req.session.user) {
-    return next();
-  }
-  return res.status(401).json({ message: "Unauthorized. Please log in first." });
-};
-
-const isAjaxRequest = (req, res, next) => {
-  if (req.get('X-Requested-With') === 'XMLHttpRequest') {
-    return next();
-  }
-  return res.status(403).json({ message: "Forbidden: direct access not allowed" });
-};
 
 // Temporary storage for user states
 const userStates = {};
@@ -635,7 +646,7 @@ function formatTimeLabel(time24) {
   return `${hours}:${minutesStr} ${suffix}`;
 }
 
-app.get('/api/csrf-token', csrfProtection, (req, res) => {
+app.get('/get-csrf-token', csrfProtection, (req, res) => {
   const token = req.csrfToken();
   res.cookie('XSRF-TOKEN', token);
   res.json({ csrfToken: token });
@@ -771,7 +782,7 @@ app.post("/logout", (req, res) => {
   });
 });
 
-app.post("/api/apply-as-mentor", csrfProtection, isAuthenticated, isAjaxRequest, async (req, res) => {
+app.post("/api/apply-as-mentor", async (req, res) => {
   const {
     affiliation,
     motivation,
@@ -1057,7 +1068,7 @@ app.post("/signup", async (req, res) => {
 
 //Decline Application
 
-app.post("/notify-mentor-application-status", async (req, res) => {
+app.post("/api/notify-mentor-application-status", async (req, res) => {
   const { applicationId, status } = req.body;
 
   if (!applicationId || !status) {
@@ -1127,7 +1138,7 @@ app.post("/notify-mentor-application-status", async (req, res) => {
   }
 });
 
-app.post("/signup-LSEEDCoordinator", async (req, res) => {
+app.post("/api/signup-lseed-coordinator", async (req, res) => {
   const { firstName, lastName, email, contactno, password, token } = req.body;
 
   // Validate required fields
@@ -1225,7 +1236,7 @@ app.post("/signup-LSEEDCoordinator", async (req, res) => {
   }
 });
 
-app.post("/accept-mentor-application", async (req, res) => {
+app.post("/api/accept-mentor-application", async (req, res) => {
   const { applicationId } = req.body;
 
   try {
@@ -1454,34 +1465,20 @@ app.post("/accept-mentor-application", async (req, res) => {
   }
 });
 
-app.get("/api/mentors", isAuthenticated, isAjaxRequest, async (req, res) => {
+app.get("/api/mentors", async (req, res) => {
   try {
     const mentors = await getAllMentors();
-
-    if (mentors.length === 0) {
-      return res.status(404).json({
-        message: "No mentors found",
-        mentors: []
-      });
-    }
-
-    res.status(200).json({
-      message: "Mentor list retrieved successfully",
-      mentors
-    });
+    res.status(200).json(mentors);
   } catch (error) {
     console.error("❌ Error fetching mentors:", error);
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: error.message
-    });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
 app.get("/api/mentors-with-mentorships", async (req, res) => {
   try {
     const mentors = await getAllMentorsWithMentorships();
-    res.json(mentors);
+    res.status(200).json(mentors);
   } catch (error) {
     console.error("❌ Error fetching mentors:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2105,7 +2102,7 @@ app.get("/api/admin/users", async (req, res) => {
   }
 });
 
-app.get('/check-mentor-application-status', async (req, res) => {
+app.get('/api/check-mentor-application-status', async (req, res) => {
   try {
     // Get user email from your session
     const userEmail = req.session.user?.email;
@@ -2887,7 +2884,7 @@ app.get("/list-se-applications", async (req, res) => {
   }
 });
 
-app.get("/list-mentor-applications", async (req, res) => {
+app.get("/api/list-mentor-applications", async (req, res) => {
   try {
     const applicationList = await getMentorFormApplications(); 
     res.json(applicationList);
@@ -2969,7 +2966,7 @@ app.put("/api/application/:id/status", async (req, res) => {
 });
 
 // PUT route to update mentor application status
-app.put("/mentor-application/:id/status", async (req, res) => {
+app.put("/api/mentor-application/:id/status", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -4944,7 +4941,7 @@ app.get("/getMentorshipDates", async (req, res) => {
   }
 });
 
-app.post("/suggested-mentors", async (req, res) => {
+app.post("/api/suggested-mentors", async (req, res) => {
   try {
     const { se_id } = req.body;
 

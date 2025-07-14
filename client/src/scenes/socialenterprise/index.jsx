@@ -32,6 +32,7 @@ import Header from "../../components/Header";
 import SEPerformanceTrendChart from "../../components/SEPerformanceTrendChart";
 import { useNavigate } from "react-router-dom"; // For navigation
 import { useAuth } from "../../context/authContext";
+import axiosClient from "../../api/axiosClient";
 
 const SocialEnterprise = ({ }) => {
   const theme = useTheme();
@@ -228,14 +229,7 @@ const SocialEnterprise = ({ }) => {
 
     const fetchMentors = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`, 
-          {
-            withCredentials: true,
-            headers: {
-              'X-Requested-With': 'XMLHttpRequest'
-            }
-          }
-        ); // Fetch mentors from API
+        const response = await axiosClient.get(`/api/mentors`); // Fetch mentors from API
         setMentors(response.data);
         console.log("mentorsdata", response.data);
       } catch (error) {

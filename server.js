@@ -2366,6 +2366,7 @@ app.get("/getUpcomingSchedulesForMentor", async (req, res) => {
   }
 });
 
+
 app.get("/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
   try {
     const { se_id } = req.params; // Extract se_id from route parameters
@@ -2388,39 +2389,39 @@ app.get("/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
 
 // CARLOS
 
-app.get("/getMentorEvaluationsByMentorID", async (req, res) => {
+app.get("/api/mentor-evaluations-by-mentor-id", async (req, res) => {
   try {
-    const { mentor_id } = req.query; // Extract se_id from query parameters
+    const { mentor_id } = req.query; // Extract mentor_id from query parameters
 
     if (!mentor_id) {
-      return res.status(400).json({ message: "se_id is required" });
+      return res.status(400).json({ message: "mentor_id is required" });
     }
 
-    const result = await getEvaluationsByMentorID(mentor_id); // Fetch SEs from DB
+    const result = await getEvaluationsByMentorID(mentor_id); // Fetch evaluations from DB
     if (!result || result.length === 0) {
       return res.status(404).json({ message: "No evaluations found" });
     }
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Error fetching social enterprises:", error);
+    console.error("Error fetching mentor evaluations:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.get("/getAllMentorEvaluationType", async (req, res) => {
+app.get("/api/all-mentor-evaluation-types", async (req, res) => {
   try {
-    const result = await getAllMentorTypeEvaluations() // Fetch SEs from DB
+    const result = await getAllMentorTypeEvaluations(); // Fetch evaluation types from DB
     if (!result || result.length === 0) {
-      return res.status(404).json({ message: "No evaluations found" });
+      return res.status(404).json({ message: "No evaluation types found" });
     }
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Error fetching social enterprises:", error);
+    console.error("Error fetching evaluation types:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.get("/getEvaluationDetails", async (req, res) => {
+app.get("/api/evaluation-details", async (req, res) => {
   try {
       const { evaluation_id } = req.query; // Extract evaluation_id from query parameters
 
@@ -2434,14 +2435,14 @@ app.get("/getEvaluationDetails", async (req, res) => {
           return res.status(404).json({ message: "No evaluation details found" });
       }
 
-      res.json(result);
+      res.status(200).json(result);
   } catch (error) {
       console.error("❌ Error fetching evaluation details:", error);
       res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.get("/checkTelegramRegistration", async (req, res) => {
+app.get("/api/check-telegram-registration", async (req, res) => {
   const { mentor_id, se_id } = req.query;
 
   if (!mentor_id || !se_id) {
@@ -2450,14 +2451,14 @@ app.get("/checkTelegramRegistration", async (req, res) => {
 
   try {
     const exists = await checkTelegramBotTable(mentor_id, se_id); // Your DB query
-    return res.json({ exists });
+    return res.status(200).json({ exists });
   } catch (err) {
     console.error("❌ Error checking telegram registration:", err);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.get("/getEvaluationDetailsForMentorEvaluation", async (req, res) => {
+app.get("/api/evaluation-details-for-mentor-evaluation", async (req, res) => {
   try {
       const { evaluation_id } = req.query; // Extract evaluation_id from query parameters
 
@@ -2471,7 +2472,7 @@ app.get("/getEvaluationDetailsForMentorEvaluation", async (req, res) => {
           return res.status(404).json({ message: "No evaluation details found" });
       }
 
-      res.json(result);
+      res.status(200).json(result);
   } catch (error) {
       console.error("❌ Error fetching evaluation details:", error);
       res.status(500).json({ message: "Internal Server Error" });
@@ -2495,7 +2496,7 @@ app.post("/api/session/role", (req, res) => {
 
   console.log("✅ Active role set in session:", req.session.user);
 
-  res.json({ success: true });
+  res.status(200).json({ success: true });
 });
 
 app.get("/api/top-se-performance", async (req, res) => {
@@ -2522,7 +2523,7 @@ app.get("/api/top-se-performance", async (req, res) => {
     }
 
     // Return the fetched data
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching top SE performance:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2539,7 +2540,7 @@ app.get("/api/mentor-critical-areas/:mentor_id", async (req, res) => {
 
     const criticalAreas = await getCriticalAreasByMentorID(mentor_id);
 
-    res.json({ criticalAreas });
+    res.status(200).json({ criticalAreas });
   } catch (error) {
     console.error("❌ Error fetching mentor critical areas:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2559,7 +2560,7 @@ app.get("/api/mentor-analytics/:mentor_id", async (req, res) => {
     const avgRatingPerCategory = await getAvgRatingForMentor(mentor_id);
     const performanceOverview = await getPerformanceOverviewForMentor(mentor_id);
 
-    res.json({
+    res.status(200).json({
       totalEvaluations: mentorEvaluationCount,
       avgRating: mentorAvgRating,
       mostFrequentRating: mentorFrequentRating,
@@ -2580,7 +2581,7 @@ app.get("/api/critical-areas/:se_id", async (req, res) => {
 
     const areasOfFocus = await getAreasOfFocus(se_id);
     
-    res.json(areasOfFocus)
+    res.status(200).json(areasOfFocus);
   } catch (error) {
     console.error("Error fetching SE analytics stats:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2598,7 +2599,7 @@ app.get("/api/se-analytics-stats/:se_id", async (req, res) => {
     const acknowledgedEvaluations = await getAcknowledgedEvaluationCount(se_id) || 0;
     const avgRating = await avgRatingPerSE(se_id) || 0;
 
-    res.json({ registeredUsers, totalEvaluations, pendingEvaluations, avgRating, acknowledgedEvaluations });
+    res.status(200).json({ registeredUsers, totalEvaluations, pendingEvaluations, avgRating, acknowledgedEvaluations });
   } catch (error) {
     console.error("Error fetching SE analytics stats:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2611,12 +2612,12 @@ app.get("/api/common-challenges/:se_id", async (req, res) => {
     const result = await getCommonChallengesBySEID(se_id);
     
     if (!result || result.length === 0) {
-      return res.json({ message: "No common challenges data available" });
+      return res.status(200).json({ message: "No common challenges data available" });
     }
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Error fetching performance trend:", error);
+    console.error("Error fetching common challenges:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
@@ -2627,10 +2628,10 @@ app.get("/api/likert-data/:se_id", async (req, res) => {
     const result = await getPermanceScoreBySEID(se_id);
     
     if (!result || result.length === 0) {
-      return res.json({ message: "No performance score data available" });
+      return res.status(200).json({ message: "No performance score data available" });
     }
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching performance score:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2643,10 +2644,10 @@ app.get("/api/radar-data/:se_id", async (req, res) => {
     const result = await getPerformanceOverviewBySEID(se_id);
     
     if (!result || result.length === 0) {
-      return res.json({ message: "No performance overview data available" });
+      return res.status(200).json({ message: "No performance overview data available" });
     }
 
-    res.json(result);
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching performance overview:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2714,7 +2715,7 @@ app.post("/api/remove-mentorship", async (req, res) => {
 
     await client.query("COMMIT");
 
-    res.json({ success: true, message: "Mentorship removed and notifications sent." });
+    res.status(200).json({ success: true, message: "Mentorship removed and notifications sent." });
 
   } catch (error) {
     await client.query("ROLLBACK");
@@ -2725,7 +2726,7 @@ app.post("/api/remove-mentorship", async (req, res) => {
   }
 });
 
-app.get("/getMentorshipsbyID", async (req, res) => {
+app.get("/api/mentorships-by-id", async (req, res) => {
   try {
     const { mentor_id } = req.query; // Extract mentor_id from query parameters
 
@@ -2734,7 +2735,7 @@ app.get("/getMentorshipsbyID", async (req, res) => {
     }
 
     // Fetch mentorships based on mentor_id from the database
-    const mentorships = await getMentorshipsForScheduling(mentor_id) // Assume this function exists in your DB logic
+    const mentorships = await getMentorshipsForScheduling(mentor_id); // Assume this function exists in your DB logic
 
     if (!mentorships || mentorships.length === 0) {
       return res.status(404).json({ message: "No mentorships found for the given mentor_id" });
@@ -2747,7 +2748,7 @@ app.get("/getMentorshipsbyID", async (req, res) => {
   }
 });
 
-app.get("/getAvailableEvaluations", async (req, res) => {
+app.get("/api/available-evaluations", async (req, res) => {
   try {
     const mentor_id = req.session.user?.id;
 
@@ -2756,20 +2757,20 @@ app.get("/getAvailableEvaluations", async (req, res) => {
     }
 
     // Fetch mentorships based on mentor_id from the database
-    const mentorships = await getMentorshipsByMentorId(mentor_id) // Assume this function exists in your DB logic
+    const mentorships = await getMentorshipsByMentorId(mentor_id); // Assume this function exists in your DB logic
 
     if (!mentorships || mentorships.length === 0) {
       return res.status(404).json({ message: "No mentorships found for the given mentor_id" });
     }
 
-    res.json(mentorships); // Send the mentorships data
+    res.status(200).json(mentorships); // Send the mentorships data
   } catch (error) {
     console.error("Error fetching mentorships:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-app.get("/getPreDefinedComments", async (req, res) => {
+app.get("/api/predefined-comments", async (req, res) => {
   try {
     const data = await getPreDefinedComments(); // Fetch predefined comments
 
@@ -2777,7 +2778,7 @@ app.get("/getPreDefinedComments", async (req, res) => {
       return res.status(404).json({ error: "No predefined comments found" });
     }
 
-    res.json(data);
+    res.status(200).json(data);
   } catch (error) {
     console.error("❌ Error fetching predefined comments:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -2785,21 +2786,20 @@ app.get("/getPreDefinedComments", async (req, res) => {
 });
 
 // API endpoint to fetch all programs
-app.get("/getAllPrograms", async (req, res) => {
+app.get("/api/all-programs", async (req, res) => {
   try {
     const programs = await getAllPrograms(); // Fetch programs from the controller
-    res.json(programs); // Send the programs as JSON
+    res.status(200).json(programs); // Send the programs as JSON
   } catch (error) {
     console.error("Error fetching programs:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-
-app.get("/list-se-applications", async (req, res) => {
+app.get("/api/list-se-applications", async (req, res) => {
   try {
     const applicationList = await getApplicationList(); 
-    res.json(applicationList);
+    res.status(200).json(applicationList);
   } catch (error) {
     console.error("Error fetching application list:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -2809,12 +2809,13 @@ app.get("/list-se-applications", async (req, res) => {
 app.get("/api/list-mentor-applications", async (req, res) => {
   try {
     const applicationList = await getMentorFormApplications(); 
-    res.json(applicationList);
+    res.status(200).json(applicationList);
   } catch (error) {
     console.error("Error fetching application list:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
+
 
 //CARLOS
 

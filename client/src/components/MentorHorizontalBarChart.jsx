@@ -10,18 +10,23 @@ const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
 
   useEffect(() => {
     const fetchMentorAvgRatings = async () => {
-      if (!mentorId) return; 
-  
+      if (!mentorId) return;
+
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/mentor-analytics/${mentorId}`);
+        const response = await axiosClient.get(
+          `/api/mentor-analytics/${mentorId}`
+        );
         const data = await response.json();
-  
-        if (!data.avgRatingPerCategory || !Array.isArray(data.avgRatingPerCategory)) {
+
+        if (
+          !data.avgRatingPerCategory ||
+          !Array.isArray(data.avgRatingPerCategory)
+        ) {
           console.warn("❌ Unexpected response:", data);
           setAvgRatings([]);
           return;
         }
-  
+
         const transformed = data.avgRatingPerCategory.map((item) => ({
           category: item.category_name,
           score: parseFloat(item.avg_rating) || 0,
@@ -33,7 +38,7 @@ const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
         setAvgRatings([]);
       }
     };
-  
+
     fetchMentorAvgRatings();
   }, [mentorId]);
 
@@ -109,7 +114,14 @@ const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
           labelSkipHeight={12}
           labelTextColor={{ from: "color", modifiers: [["darker", 1.6]] }}
           tooltip={({ indexValue, value }) => (
-            <div style={{ background: "#333", padding: "6px", borderRadius: "4px", color: "#fff" }}>
+            <div
+              style={{
+                background: "#333",
+                padding: "6px",
+                borderRadius: "4px",
+                color: "#fff",
+              }}
+            >
               <strong>{indexValue}</strong>
               <br />
               Score: {value}

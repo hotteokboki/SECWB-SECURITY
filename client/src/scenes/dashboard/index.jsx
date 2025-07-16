@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { tokens } from "../../theme";
 import PersonIcon from "@mui/icons-material/Person";
-import { useAuth } from "../../context/authContext"; 
+import { useAuth } from "../../context/authContext";
 import SchoolIcon from "@mui/icons-material/School";
 import AcknowledgmentChart from "../../components/AcknowledgmentChart";
 import Header from "../../components/Header";
@@ -42,7 +42,7 @@ import {
 import axios from "axios";
 import axiosClient from "../../api/axiosClient";
 
-const Dashboard = ({ }) => {
+const Dashboard = ({}) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { user, isMentorView, toggleView, loading: authLoading } = useAuth();
@@ -73,7 +73,9 @@ const Dashboard = ({ }) => {
   const [percentageIncrease, setPercentageIncrease] = useState("0%");
 
   const hasMentorRole = user?.roles?.includes("Mentor");
-  const isLSEEDUser = user?.roles?.some(role => role === "LSEED-Coordinator" || role === "Administrator");
+  const isLSEEDUser = user?.roles?.some(
+    (role) => role === "LSEED-Coordinator" || role === "Administrator"
+  );
   const isCoordinator = user?.roles?.includes("LSEED-Coordinator");
   const hasBothRoles = hasMentorRole && isLSEEDUser;
   const isCoordinatorView = !isMentorView;
@@ -88,16 +90,28 @@ const Dashboard = ({ }) => {
   useEffect(() => {
     const fetchMentorDashboardStats = async () => {
       try {
+        const response = await axiosClient.get(
+          `/api/fetch-mentor-dashboard-stats`
+        );
 
-        const response = await axiosClient.get(`/api/fetch-mentor-dashboard-stats`);
-
-        const data = response.data; 
+        const data = response.data;
 
         const formattedData = {
-          totalEvalMade: parseInt(data.totalEvalMade?.[0]?.evaluation_count ?? "0", 10),
-          avgRatingGiven: parseFloat(data.avgRatingGiven?.[0]?.average_rating ?? "0"),
-          mostCommonRating: parseInt(data.mostCommonRating?.[0]?.rating ?? "0", 10),
-          mentorshipsCount: parseInt(data.mentorshipsCount?.[0]?.mentorship_count ?? "0", 10),
+          totalEvalMade: parseInt(
+            data.totalEvalMade?.[0]?.evaluation_count ?? "0",
+            10
+          ),
+          avgRatingGiven: parseFloat(
+            data.avgRatingGiven?.[0]?.average_rating ?? "0"
+          ),
+          mostCommonRating: parseInt(
+            data.mostCommonRating?.[0]?.rating ?? "0",
+            10
+          ),
+          mentorshipsCount: parseInt(
+            data.mentorshipsCount?.[0]?.mentorship_count ?? "0",
+            10
+          ),
         };
 
         console.log("DATA DEBUG:", formattedData);
@@ -105,7 +119,7 @@ const Dashboard = ({ }) => {
         setMentorDashboardStats(formattedData);
       } catch (error) {
         console.error("❌ Error fetching mentor dashboard stats:", error);
-      } 
+      }
     };
 
     if (user?.roles?.includes("Mentor")) {
@@ -115,7 +129,6 @@ const Dashboard = ({ }) => {
       setMentorDashboardStats({});
     }
   }, [user]);
-
 
   const alertColumns = [
     { field: "seName", headerName: "SE Name", flex: 2 },
@@ -191,11 +204,14 @@ const Dashboard = ({ }) => {
         setIsLoadingEvaluations(true);
 
         let response;
-        
+
         if (hasMentorRole) {
-          response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/getRecentMentorEvaluations`, {
-            withCredentials: true,
-          });
+          response = await axios.get(
+            `${process.env.REACT_APP_API_BASE_URL}/getRecentMentorEvaluations`,
+            {
+              withCredentials: true,
+            }
+          );
         } else {
           setmentorEvaluations([]); // clear any old data
           return;
@@ -232,13 +248,18 @@ const Dashboard = ({ }) => {
         setIsLoadingEvaluations(true);
 
         let response;
-        
+
         if (hasMentorRole) {
-          response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/getUpcomingSchedulesForMentor`, {
-            withCredentials: true,
-          });
+          response = await axios.get(
+            `${process.env.REACT_APP_API_BASE_URL}/getUpcomingSchedulesForMentor`,
+            {
+              withCredentials: true,
+            }
+          );
         } else {
-          console.log("User is not a Mentor → skipping mentor evaluations fetch.");
+          console.log(
+            "User is not a Mentor → skipping mentor evaluations fetch."
+          );
           setmentorEvaluations([]); // clear any old data
           return;
         }
@@ -258,10 +279,30 @@ const Dashboard = ({ }) => {
   }, [user]);
 
   const mentorColumns = [
-    { field: "social_enterprise", headerName: "Social Enterprise", flex: 1, minWidth: 100 },
-    { field: "evaluator_name", headerName: "Evaluator", flex: 1, minWidth: 100 },
-    { field: "acknowledged", headerName: "Acknowledged", flex: 1, minWidth: 100 },
-    { field: "evaluation_date", headerName: "Evaluation Date", flex: 1, minWidth: 100 },
+    {
+      field: "social_enterprise",
+      headerName: "Social Enterprise",
+      flex: 1,
+      minWidth: 100,
+    },
+    {
+      field: "evaluator_name",
+      headerName: "Evaluator",
+      flex: 1,
+      minWidth: 100,
+    },
+    {
+      field: "acknowledged",
+      headerName: "Acknowledged",
+      flex: 1,
+      minWidth: 100,
+    },
+    {
+      field: "evaluation_date",
+      headerName: "Evaluation Date",
+      flex: 1,
+      minWidth: 100,
+    },
     {
       field: "action",
       headerName: "Action",
@@ -281,25 +322,22 @@ const Dashboard = ({ }) => {
 
   const handleAcceptClick = async (schedule) => {
     try {
-      const {
-        id,
-        mentorship_id,
-        realDate,
-        realTime,
-        zoom
-      } = schedule;
+      const { id, mentorship_id, realDate, realTime, zoom } = schedule;
 
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/approveMentorship`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mentoring_session_id: id,
-          mentorship_id,
-          mentorship_date: realDate,
-          mentorship_time: realTime,
-          zoom_link: zoom,
-        }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/approveMentorship`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mentoring_session_id: id,
+            mentorship_id,
+            mentorship_date: realDate,
+            mentorship_time: realTime,
+            zoom_link: zoom,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorMessage = await response.text();
@@ -319,11 +357,14 @@ const Dashboard = ({ }) => {
     try {
       const { id } = schedule; // Extract ID
 
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/declineMentorship`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mentoring_session_id: id }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/declineMentorship`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mentoring_session_id: id }),
+        }
+      );
 
       if (!response.ok) {
         const errorMessage = await response.text();
@@ -500,7 +541,7 @@ const Dashboard = ({ }) => {
       headerName: "Zoom Link",
       flex: 1,
       minWidth: 150,
-      renderCell: (params) => (
+      renderCell: (params) =>
         params.value && params.value !== "N/A" ? (
           <a
             href={params.value}
@@ -514,8 +555,7 @@ const Dashboard = ({ }) => {
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             N/A
           </Typography>
-        )
-      ),
+        ),
     },
   ];
 
@@ -525,22 +565,21 @@ const Dashboard = ({ }) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
+          const res = await fetch(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              method: "GET",
+              credentials: "include", // Required to send session cookie
+            }
+          );
           const data = await res.json();
           const program = data[0]?.name;
 
-          response = await axiosClient(
-            `/api/flagged-ses?program=${program}`
-          );
+          response = await axiosClient(`/api/flagged-ses?program=${program}`);
         } else {
-          response = await axiosClient(
-            `/api/flagged-ses`
-          );
+          response = await axiosClient(`/api/flagged-ses`);
         }
-        const data = response.data; 
+        const data = response.data;
 
         if (Array.isArray(data)) {
           const formattedSEs = data.map((se) => ({
@@ -569,17 +608,21 @@ const Dashboard = ({ }) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
+          const res = await fetch(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              method: "GET",
+              credentials: "include", // Required to send session cookie
+            }
+          );
 
           const data = await res.json();
           const program = data[0]?.name;
 
-          response = await axiosClient(`/api/pending-schedules?program=${program}`);
-        }
-        else {
+          response = await axiosClient(
+            `/api/pending-schedules?program=${program}`
+          );
+        } else {
           response = await axiosClient(`/api/pending-schedules`);
         }
         const data = response.data;
@@ -624,11 +667,9 @@ const Dashboard = ({ }) => {
     console.log("📌 Evaluation ID Passed:", evaluation_id); // Debugging log
 
     try {
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_BASE_URL}/getEvaluationDetails`,
-        {
-          params: { evaluation_id },
-        }
+      const response = await axiosClient.get(
+        `/api/evaluation-details-for-mentor-evaluation`,
+        { params: { evaluation_id } }
       );
 
       console.log("📥 Raw API Response:", response); // Log raw response
@@ -683,12 +724,15 @@ const Dashboard = ({ }) => {
     const fetchEvaluationStats = async () => {
       try {
         let response;
-        
+
         if (isCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
+          const res = await fetch(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              method: "GET",
+              credentials: "include", // Required to send session cookie
+            }
+          );
 
           const dataJSON = await res.json();
           const program = dataJSON[0]?.name;
@@ -696,11 +740,8 @@ const Dashboard = ({ }) => {
           response = await axiosClient(
             `/api/evaluation-stats?program=${program}`
           );
-        }
-        else {
-          response = await axiosClient(
-            `/api/evaluation-stats`
-          );
+        } else {
+          response = await axiosClient(`/api/evaluation-stats`);
         }
         const data = response.data;
 
@@ -736,23 +777,29 @@ const Dashboard = ({ }) => {
 
         let response;
         if (isCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
+          const res = await fetch(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              method: "GET",
+              credentials: "include", // Required to send session cookie
+            }
+          );
           const data = await res.json();
           const program = data[0]?.name;
 
           response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`, {
-            credentials: "include", // Required to send session cookie
-          });
-        }
-        else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`, {
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`,
+            {
               credentials: "include", // Required to send session cookie
-          });
+            }
+          );
+        } else {
+          response = await fetch(
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`,
+            {
+              credentials: "include", // Required to send session cookie
+            }
+          );
         }
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
@@ -824,25 +871,21 @@ const Dashboard = ({ }) => {
     }
   };
 
-  console.log("View: ", isCoordinatorView)
+  console.log("View: ", isCoordinatorView);
 
   return (
     <Box m="20px">
-        {/* HEADER and TOGGLE SWITCH */}
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Header
-                title={
-                    isCoordinatorView
-                        ? "LSEED Dashboard"
-                        : "Mentor Dashboard"
-                }
-                subtitle={
-                    isCoordinatorView
-                        ? "Welcome to LSEED Dashboard"
-                        : "Welcome to Mentor Dashboard"
-                }
-            />
-            {/* ⭐️ STEP 4: Render the toggle switch only if the user has both roles
+      {/* HEADER and TOGGLE SWITCH */}
+      <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Header
+          title={isCoordinatorView ? "LSEED Dashboard" : "Mentor Dashboard"}
+          subtitle={
+            isCoordinatorView
+              ? "Welcome to LSEED Dashboard"
+              : "Welcome to Mentor Dashboard"
+          }
+        />
+        {/* ⭐️ STEP 4: Render the toggle switch only if the user has both roles
             {hasBothRoles && (
               <FormControlLabel
                 control={
@@ -856,954 +899,986 @@ const Dashboard = ({ }) => {
                 labelPlacement="start"
               />
             )} */}
-        </Box>
+      </Box>
 
-        {/* --- */}
+      {/* --- */}
 
-        {/* CONDITIONAL RENDERING OF DASHBOARD LAYOUTS */}
-        {isCoordinatorView ? (
-            // === LSEED-COORDINATOR VIEW LAYOUT ===
-            <>
-                <Box
-                    display="grid"
-                    gridTemplateColumns="repeat(12, 1fr)"
-                    gridAutoRows="140px"
-                    gap="20px"
-                >
-                    {/* StatBoxes for Coordinator View */}
-                    {/* Unassigned Mentors */}
-                    <Box
-                        gridColumn="span 3"
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        bgcolor={colors.primary[400]}
-                    >
-                        <StatBox
-                            title={stats?.mentorWithoutMentorshipCount[0]?.count}
-                            subtitle="Unassigned Mentors"
-                            progress={
-                                parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
-                                parseInt(stats?.mentorCountTotal[0]?.count)
-                            }
-                            increase={
-                              isNaN(parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
-                                parseInt(stats?.mentorCountTotal[0]?.count))
-                              ? "0%"
-                              :
-                              `${((parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
-                                    parseInt(stats?.mentorCountTotal[0]?.count)) *
-                                    100
-                                ).toFixed(2)}%`
-                            }
-                            icon={
-                                <PersonIcon
-                                    sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
-                                />
-                            }
-                        />
-                    </Box>
+      {/* CONDITIONAL RENDERING OF DASHBOARD LAYOUTS */}
+      {isCoordinatorView ? (
+        // === LSEED-COORDINATOR VIEW LAYOUT ===
+        <>
+          <Box
+            display="grid"
+            gridTemplateColumns="repeat(12, 1fr)"
+            gridAutoRows="140px"
+            gap="20px"
+          >
+            {/* StatBoxes for Coordinator View */}
+            {/* Unassigned Mentors */}
+            <Box
+              gridColumn="span 3"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              bgcolor={colors.primary[400]}
+            >
+              <StatBox
+                title={stats?.mentorWithoutMentorshipCount[0]?.count}
+                subtitle="Unassigned Mentors"
+                progress={
+                  parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
+                  parseInt(stats?.mentorCountTotal[0]?.count)
+                }
+                increase={
+                  isNaN(
+                    parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
+                      parseInt(stats?.mentorCountTotal[0]?.count)
+                  )
+                    ? "0%"
+                    : `${(
+                        (parseInt(
+                          stats?.mentorWithoutMentorshipCount[0]?.count
+                        ) /
+                          parseInt(stats?.mentorCountTotal[0]?.count)) *
+                        100
+                      ).toFixed(2)}%`
+                }
+                icon={
+                  <PersonIcon
+                    sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                  />
+                }
+              />
+            </Box>
 
-                    {/* Assigned Mentors */}
-                    <Box
-                        gridColumn="span 3"
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        bgcolor={colors.primary[400]}
-                    >
-                        <StatBox
-                            title={stats?.mentorWithMentorshipCount[0]?.count}
-                            subtitle="Assigned Mentors"
-                            progress={
-                                parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
-                                parseInt(stats?.mentorCountTotal[0]?.count)
-                            }
-                            increase={
-                              isNaN(parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
-                                parseInt(stats?.mentorCountTotal[0]?.count))
-                                ? "0%" :
-                                `${((parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
-                                      parseInt(stats?.mentorCountTotal[0]?.count)) *
-                                  100
-                              ).toFixed(2)}%`}
-                            icon={
-                                <PersonIcon
-                                    sx={{ fontSize: "26px", color: colors.blueAccent[500] }}
-                                />
-                            }
-                        />
-                    </Box>
+            {/* Assigned Mentors */}
+            <Box
+              gridColumn="span 3"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              bgcolor={colors.primary[400]}
+            >
+              <StatBox
+                title={stats?.mentorWithMentorshipCount[0]?.count}
+                subtitle="Assigned Mentors"
+                progress={
+                  parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
+                  parseInt(stats?.mentorCountTotal[0]?.count)
+                }
+                increase={
+                  isNaN(
+                    parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
+                      parseInt(stats?.mentorCountTotal[0]?.count)
+                  )
+                    ? "0%"
+                    : `${(
+                        (parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
+                          parseInt(stats?.mentorCountTotal[0]?.count)) *
+                        100
+                      ).toFixed(2)}%`
+                }
+                icon={
+                  <PersonIcon
+                    sx={{ fontSize: "26px", color: colors.blueAccent[500] }}
+                  />
+                }
+              />
+            </Box>
 
-                    {/* Total Social Enterprises */}
-                    <Box
-                        gridColumn="span 3"
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        bgcolor={colors.primary[400]}
-                    >
-                      <Chip
-                        label={
-                          <Box sx={{ textAlign: "center" }}>
-                            <Typography sx={{ fontSize: "20px", lineHeight: 1.2 }}>
-                              {stats.totalSocialEnterprises}
-                            </Typography>
-                            <Typography sx={{ fontSize: "16px", lineHeight: 1.2 }}>
-                              involved
-                            </Typography>
-                            <Typography
-                              sx={{
-                                fontSize: "16px",
-                                lineHeight: 1.2,
-                                wordBreak: "keep-all", // prevent mid-word breaks
-                                whiteSpace: "nowrap",  // keep full phrase on one line
-                              }}
-                            >
-                              {stats.totalSocialEnterprises === 1
-                                ? "Social Enterprise"
-                                : "Social Enterprises"}
-                            </Typography>
-                          </Box>
-                        }
-                        icon={
-                          <BusinessIcon
-                            sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
-                          />
-                        }
-                        sx={{
-                          p: "10px",
-                          backgroundColor: colors.primary[400],
-                          color: colors.grey[100],
-                          "& .MuiChip-icon": { color: colors.greenAccent[500] },
-                          maxWidth: "200px", // more width to fit longer words
-                          whiteSpace: "normal", // allow wrapping between lines
-                        }}
-                      />
-                    </Box>
-
-                    {/* Total Programs (LSEED) */}
-                    <Box
-                        gridColumn="span 3"
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        bgcolor={colors.primary[400]}
-                    >
-                        <Chip
-                            label={`${stats.totalPrograms} LSEED ${
-                                stats.totalPrograms === 1 ? "Program" : "Programs"
-                            }`}
-                            icon={
-                                <SchoolIcon
-                                    sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
-                                />
-                            }
-                            sx={{
-                                fontSize: "20px",
-                                p: "10px",
-                                backgroundColor: colors.primary[400],
-                                color: colors.grey[100],
-                                "& .MuiChip-icon": { color: colors.greenAccent[500] },
-                            }}
-                        />
-                    </Box>
-
-                    {/* SE Performance Trend Chart */}
-                    <Box
-                        gridColumn="span 12"
-                        gridRow="span 3"
-                        bgcolor={colors.primary[400]}
-                        paddingTop={2}
-                        paddingLeft={2}
-                        paddingright={2}
-                    >
-                        <SEPerformanceTrendChart userRole={user?.roles} />
-                    </Box>
-
-                    {/* Left Section (Stat Boxes) */}
-                    <Box
-                        gridColumn="span 3"
-                        gridRow="span 2"
-                        display="grid"
-                        gridTemplateRows="1fr 1fr"
-                        gap={3}
-                        borderRadius="8px"
-                    >
-                        {/* Total Evaluations */}
-                        <Box
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                            bgcolor={colors.primary[400]}
-                            p={2}
-                        >
-                            <Chip
-                                label={`${evaluations.total} Total Evaluations`}
-                                icon={
-                                    <PendingActionsIcon
-                                        sx={{ fontSize: "26px", color: colors.blueAccent[500] }}
-                                    />
-                                }
-                                sx={{
-                                    fontSize: "20px",
-                                    p: "10px",
-                                    backgroundColor: colors.primary[400],
-                                    color: colors.grey[100],
-                                    "& .MuiChip-icon": { color: colors.blueAccent[500] },
-                                }}
-                            />
-                        </Box>
-
-                        {/* Acknowledged Evaluations */}
-                        <Box
-                            bgcolor={colors.primary[400]}
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                            p={2}
-                        >
-                            <StatBox
-                                title={evaluations.acknowledged}
-                                subtitle="Acknowledged Evaluations"
-                                increase={acknowledgedPercentage}
-                                icon={
-                                    <AssignmentTurnedInIcon
-                                        sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
-                                    />
-                                }
-                            />
-                        </Box>
-                    </Box>
-
-                    {/* Right Section (Chart) */}
-                    <Box
-                        gridColumn="span 9"
-                        gridRow="span 2"
-                        bgcolor={colors.primary[400]}
-                        p={2}
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        height="100%"
-                        minHeight="300px"
-                        overflow="hidden"
-                    >
-                        <AcknowledgmentChart
-                            style={{
-                                width: "200px",
-                                height: "200px",
-                                maxWidth: "400px",
-                                maxHeight: "300px",
-                                objectFit: "contain",
-                            }}
-                        />
-                    </Box>
-
-                    {/* Alert & Schedule Sections */}
-                    <Box
-                        gridColumn="span 12"
-                        gridRow="span 3"
-                        display="grid"
-                        gridTemplateColumns="repeat(12, 1fr)"
-                        gap="20px"
-                    >
-                        {/* SEs Requiring Immediate Attention 🚨 */}
-                        <Box
-                            gridColumn="span 6"
-                            backgroundColor={colors.primary[400]}
-                            padding="20px"
-                        >
-                            <Typography
-                                variant="h3"
-                                fontWeight="bold"
-                                color={colors.redAccent[500]}
-                                marginBottom="15px"
-                            >
-                                SEs Requiring Immediate Attention
-                            </Typography>
-                            <Box
-                                sx={{
-                                    height: "400px",
-                                    minHeight: "400px",
-                                    backgroundColor: colors.primary[400],
-                                    "& .MuiDataGrid-root": { border: "none" },
-                                    "& .MuiDataGrid-cell": { borderBottom: "none" },
-                                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
-                                        backgroundColor: colors.blueAccent[700] + " !important",
-                                    },
-                                    "& .MuiDataGrid-virtualScroller": {
-                                        backgroundColor: colors.primary[400],
-                                    },
-                                    "& .MuiDataGrid-footerContainer": {
-                                        borderTop: "none",
-                                        backgroundColor: colors.blueAccent[700],
-                                        color: colors.grey[100],
-                                    },
-                                }}
-                            >
-                                {loading ? (
-                                    <Typography>Loading...</Typography>
-                                ) : (
-                                    <DataGrid rows={lowPerformingSEs} columns={alertColumns} />
-                                )}
-                            </Box>
-                        </Box>
-
-                        {/* Pending Mentoring Schedules 🕒 */}
-                        <Box
-                            gridColumn="span 6"
-                            backgroundColor={colors.primary[400]}
-                            padding="20px"
-                        >
-                            <Typography
-                                variant="h3"
-                                fontWeight="bold"
-                                color={colors.blueAccent[500]}
-                                marginBottom="15px"
-                            >
-                                Pending Mentoring Schedules
-                            </Typography>
-                            <Box
-                                sx={{
-                                    height: "400px",
-                                    minHeight: "400px",
-                                    backgroundColor: colors.primary[400],
-                                    "& .MuiDataGrid-root": { border: "none" },
-                                    "& .MuiDataGrid-cell": { borderBottom: "none" },
-                                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
-                                        backgroundColor: colors.blueAccent[700] + " !important",
-                                    },
-                                    "& .MuiDataGrid-virtualScroller": {
-                                        backgroundColor: colors.primary[400],
-                                    },
-                                    "& .MuiDataGrid-footerContainer": {
-                                        borderTop: "none",
-                                        backgroundColor: colors.blueAccent[700],
-                                        color: colors.grey[100],
-                                    },
-                                }}
-                            >
-                                {loading ? (
-                                    <Typography>Loading...</Typography>
-                                ) : mentorSchedules.length > 0 ? (
-                                    <DataGrid
-                                        rows={mentorSchedules.map((schedule) => ({
-                                            id: schedule.mentoring_session_id,
-                                            sessionDetails: `Mentoring Session for ${
-                                                schedule.team_name || "Unknown SE"
-                                            } with Mentor ${
-                                                schedule.mentor_name || "Unknown Mentor"
-                                            }`,
-                                            date: `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` || "N/A",
-                                            time: schedule.mentoring_session_time || "N/A",
-                                            zoom: schedule.zoom_link || "N/A",
-                                            mentorship_id: schedule.mentorship_id,
-                                            status: schedule.status || "Pending",
-                                            realDate: schedule.mentoring_session_date || "N/A",     // for backend
-                                            realTime: schedule.mentoring_session_time || "N/A",     // for backend
-                                        }))}
-                                        sx={{
-                                          "& .MuiDataGrid-cell": {
-                                            display: "flex",
-                                            alignItems: "center",
-                                            paddingTop: "12px",
-                                            paddingBottom: "12px",
-                                          },
-                                          "& .MuiDataGrid-cellContent": {
-                                            whiteSpace: "normal",
-                                            wordBreak: "break-word",
-                                          },
-                                        }}
-                                        getRowHeight={() => 'auto'}
-                                        columns={pendingScheduleColumns}
-                                        pageSize={5}
-                                        rowsPerPageOptions={[5, 10]}
-                                    />
-                                ) : (
-                                    <Typography>No pending schedules available.</Typography>
-                                )}
-                            </Box>
-                        </Box>
-                    </Box>
-
-                    {/* Quick Action Panel */}
-                    <Box
-                        gridColumn="span 12"
-                        gridRow="span 1"
-                        bgcolor={colors.primary[400]}
-                        padding="20px"
-                        marginTop={3}
-                    >
-                        <Typography
-                            variant="h4"
-                            fontWeight="bold"
-                            color={colors.greenAccent[500]}
-                            marginBottom="15px"
-                        >
-                            Quick Actions Panel
-                        </Typography>
-
-                        <Box
-                            display="flex"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            gap={2}
-                            width="100%"
-                        >
-                            <Button
-                                variant="contained"
-                                startIcon={<AnalyticsOutlinedIcon />}
-                                onClick={() => navigate("/analytics")}
-                                sx={{
-                                    flexGrow: 1,
-                                    backgroundColor: colors.blueAccent[800],
-                                    color: colors.grey[100],
-                                    "&:hover": {
-                                        backgroundColor: colors.blueAccent[900],
-                                    },
-                                }}
-                            >
-                                View Analytics
-                            </Button>
-                            <Button
-                                variant="contained"
-                                startIcon={<Diversity2OutlinedIcon />}
-                                onClick={() => navigate("/socialenterprise")}
-                                sx={{
-                                    flexGrow: 1,
-                                    backgroundColor: colors.blueAccent[600],
-                                    color: colors.grey[100],
-                                    "&:hover": {
-                                        backgroundColor: colors.blueAccent[700],
-                                    },
-                                }}
-                            >
-                                Social Enterprises
-                            </Button>
-                            <Button
-                                variant="contained"
-                                startIcon={<AssignmentTurnedInOutlinedIcon />}
-                                onClick={() => navigate("/assess")}
-                                sx={{
-                                    flexGrow: 1,
-                                    backgroundColor: colors.greenAccent[600],
-                                    color: colors.grey[100],
-                                    "&:hover": {
-                                        backgroundColor: colors.greenAccent[800],
-                                    },
-                                }}
-                            >
-                                Evaluate Mentor
-                            </Button>
-                        </Box>
-                    </Box>
-
-                    {/* Mentorships Section */}
-                    <Box gridColumn="span 12" gridRow="span 3" display="grid">
-                        <Box
-                            gridColumn="span 12"
-                            backgroundColor={colors.primary[400]}
-                            padding="20px"
-                        >
-                            <Typography
-                                variant="h3"
-                                fontWeight="bold"
-                                color={colors.greenAccent[500]}
-                                marginBottom="15px"
-                            >
-                                Mentorships
-                            </Typography>
-                            <Box
-                                sx={{
-                                    height: "400px",
-                                    minHeight: "400px",
-                                    backgroundColor: colors.primary[400],
-                                    "& .MuiDataGrid-root": { border: "none" },
-                                    "& .MuiDataGrid-cell": { borderBottom: "none" },
-                                    "& .name-column--cell": { color: colors.greenAccent[300] },
-                                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
-                                        backgroundColor: colors.blueAccent[700] + " !important",
-                                    },
-                                    "& .MuiDataGrid-virtualScroller": {
-                                        backgroundColor: colors.primary[400],
-                                    },
-                                    "& .MuiDataGrid-footerContainer": {
-                                        borderTop: "none",
-                                        backgroundColor: colors.blueAccent[700],
-                                        color: colors.grey[100],
-                                    },
-                                }}
-                            >
-                                {loading ? (
-                                    <Typography>Loading...</Typography>
-                                ) : (
-                                    <DataGrid rows={socialEnterprises} columns={columns} />
-                                )}
-                            </Box>
-                        </Box>
-                    </Box>
-                </Box>
-            </>
-        ) : (
-            // =========================
-            // === MENTOR VIEW LAYOUT ===
-            // =========================
-            <>
-                {/* Row 1 - StatBoxes */}
-                <Box
-                  display="flex"
-                  flexWrap="wrap"
-                  gap="20px"
-                  justifyContent="space-between"
-                  mt="20px"
-                >
-                  {/* Total Evaluations Submitted */}
-                  <Box
-                    flex="1 1 22%"
-                    backgroundColor={colors.primary[400]}
-                    display="flex"
-                    flexDirection="column"
-                    alignItems="center"
-                    justifyContent="center"
-                    p="20px"
-                  >
-                    <AssignmentTurnedInOutlinedIcon sx={{ fontSize: 40, color: colors.greenAccent[500], mb: 1 }} />
-                    <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
-                      {mentorDashboardStats?.totalEvalMade ?? 0}
+            {/* Total Social Enterprises */}
+            <Box
+              gridColumn="span 3"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              bgcolor={colors.primary[400]}
+            >
+              <Chip
+                label={
+                  <Box sx={{ textAlign: "center" }}>
+                    <Typography sx={{ fontSize: "20px", lineHeight: 1.2 }}>
+                      {stats.totalSocialEnterprises}
                     </Typography>
-                    <Typography variant="subtitle2" color={colors.grey[300]}>
-                      Total Evaluations Submitted
+                    <Typography sx={{ fontSize: "16px", lineHeight: 1.2 }}>
+                      involved
                     </Typography>
-                  </Box>
-
-                  {/* Average Rating Given to SEs */}
-                  <Box
-                    flex="1 1 22%"
-                    backgroundColor={colors.primary[400]}
-                    display="flex"
-                    flexDirection="column"
-                    alignItems="center"
-                    justifyContent="center"
-                    p="20px"
-                  >
-                    <Star sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }} />
-                    <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
-                      {(mentorDashboardStats?.avgRatingGiven ?? 0).toFixed(2)}
-                    </Typography>
-                    <Typography variant="subtitle2" color={colors.grey[300]}>
-                      Average Rating Given to SEs
-                    </Typography>
-                  </Box>
-
-                  {/* Most Common Rating */}
-                  <Box
-                    flex="1 1 22%"
-                    backgroundColor={colors.primary[400]}
-                    display="flex"
-                    flexDirection="column"
-                    alignItems="center"
-                    justifyContent="center"
-                    p="20px"
-                  >
-                    <Star sx={{ fontSize: 40, color: colors.redAccent[500], mb: 1 }} />
-                    <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
-                      {mentorDashboardStats?.mostCommonRating ?? 0}
-                    </Typography>
-                    <Typography variant="subtitle2" color={colors.grey[300]}>
-                      Most Common Rating
-                    </Typography>
-                  </Box>
-
-                  {/* Social Enterprises Handled */}
-                  <Box
-                    flex="1 1 22%"
-                    backgroundColor={colors.primary[400]}
-                    display="flex"
-                    flexDirection="column"
-                    alignItems="center"
-                    justifyContent="center"
-                    p="20px"
-                  >
-                    <Diversity2OutlinedIcon sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }} />
-                    <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
-                      {mentorDashboardStats?.mentorshipsCount ?? 0}
-                    </Typography>
-                    <Typography variant="subtitle2" color={colors.grey[300]}>
-                      Social Enterprises Handled
-                    </Typography>
-                  </Box>
-                </Box>
-                {/* Recent Evaluations */}
-                <Box
-                    width="100%"
-                    backgroundColor={colors.primary[400]}
-                    padding="20px"
-                    mt={4}
-                >
                     <Typography
-                        variant="h3"
-                        fontWeight="bold"
-                        color={colors.greenAccent[500]}
-                        marginBottom="15px"
+                      sx={{
+                        fontSize: "16px",
+                        lineHeight: 1.2,
+                        wordBreak: "keep-all", // prevent mid-word breaks
+                        whiteSpace: "nowrap", // keep full phrase on one line
+                      }}
                     >
-                        Recent Evaluations
+                      {stats.totalSocialEnterprises === 1
+                        ? "Social Enterprise"
+                        : "Social Enterprises"}
                     </Typography>
-
-                    {mentorEvaluations.length > 0 ? (
-                        <Box
-                            height="400px"
-                            minHeight="400px"
-                            sx={{
-                                "& .MuiDataGrid-root": { border: "none" },
-                                "& .MuiDataGrid-cell": { borderBottom: "none" },
-                                "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
-                                    backgroundColor: colors.blueAccent[700] + " !important",
-                                },
-                                "& .MuiDataGrid-virtualScroller": {
-                                    backgroundColor: colors.primary[400],
-                                },
-                                "& .MuiDataGrid-footerContainer": {
-                                    borderTop: "none",
-                                    backgroundColor: colors.blueAccent[700],
-                                    color: colors.grey[100],
-                                },
-                            }}
-                        >
-                            <DataGrid
-                                rows={mentorEvaluations}
-                                columns={mentorColumns}
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10]}
-                                getRowHeight={() => 'auto'}
-                                // REFERERENCE for GridToolbar
-                                sx={{
-                                  "& .MuiDataGrid-cell": {
-                                    display: "flex",
-                                    alignItems: "center", // vertical centering
-                                    paddingTop: "12px",
-                                    paddingBottom: "12px",
-                                  },
-                                  "& .MuiDataGrid-columnHeader": {
-                                    alignItems: "center", // optional: center header label vertically
-                                  },
-                                  "& .MuiDataGrid-cellContent": {
-                                    whiteSpace: "normal", // allow line wrap
-                                    wordBreak: "break-word",
-                                  },
-                                  "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
-                                  color: `${colors.grey[100]} !important`,
-                                  },
-                                }}
-                                slots={{ toolbar: GridToolbar }}
-                            />
-                        </Box>
-                    ) : (
-                        <Typography>No evaluations available.</Typography>
-                    )}
-                </Box>
-
-                {/* Quick Action Panel */}
-                <Box
-                    gridColumn="span 12"
-                    gridRow="span 1"
-                    bgcolor={colors.primary[400]}
-                    padding="20px"
-                    marginTop={3}
-                >
-                    <Typography
-                        variant="h4"
-                        fontWeight="bold"
-                        color={colors.greenAccent[500]}
-                        marginBottom="15px"
-                    >
-                        Quick Actions Panel
-                    </Typography>
-
-                    <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        gap={2}
-                        width="100%"
-                    >
-                        <Button
-                            variant="contained"
-                            startIcon={<SupervisorAccountOutlinedIcon />}
-                            onClick={() => navigate("/mentorships")}
-                            sx={{
-                                flexGrow: 1,
-                                backgroundColor: colors.blueAccent[800],
-                                color: colors.grey[100],
-                                "&:hover": {
-                                    backgroundColor: colors.blueAccent[900],
-                                },
-                            }}
-                        >
-                            Manage Mentorships
-                        </Button>
-                        <Button
-                            variant="contained"
-                            startIcon={<CalendarMonthOutlinedIcon />}
-                            onClick={() => navigate("/scheduling")}
-                            sx={{
-                                flexGrow: 1,
-                                backgroundColor: colors.blueAccent[600],
-                                color: colors.grey[100],
-                                "&:hover": {
-                                    backgroundColor: colors.blueAccent[700],
-                                },
-                            }}
-                        >
-                            Appoint a Schedule
-                        </Button>
-                        <Button
-                            variant="contained"
-                            startIcon={<AssignmentTurnedInOutlinedIcon />}
-                            onClick={() => navigate("/assess")}
-                            sx={{
-                                flexGrow: 1,
-                                backgroundColor: colors.greenAccent[600],
-                                color: colors.grey[100],
-                                "&:hover": {
-                                    backgroundColor: colors.greenAccent[800],
-                                },
-                            }}
-                        >
-                            Evaluate Social Enterprises
-                        </Button>
-                    </Box>
-                </Box>
-                
-                 {/* Upcoming Mentoring Sessions */}
-                <Box
-                    width="100%"
-                    backgroundColor={colors.primary[400]}
-                    padding="20px"
-                    mt={4}
-                >
-                    <Typography
-                        variant="h3"
-                        fontWeight="bold"
-                        color={colors.greenAccent[500]}
-                        marginBottom="15px"
-                    >
-                        Upcoming Mentoring Sessions
-                    </Typography>
-                    <Box
-                        sx={{
-                            height: "400px",
-                            minHeight: "400px",
-                            backgroundColor: colors.primary[400],
-                            "& .MuiDataGrid-root": { border: "none" },
-                            "& .MuiDataGrid-cell": { borderBottom: "none" },
-                            "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
-                                backgroundColor: colors.blueAccent[700] + " !important",
-                            },
-                            "& .MuiDataGrid-virtualScroller": {
-                                backgroundColor: colors.primary[400],
-                            },
-                            "& .MuiDataGrid-footerContainer": {
-                                borderTop: "none",
-                                backgroundColor: colors.blueAccent[700],
-                                color: colors.grey[100],
-                            },
-                        }}
-                    >
-                        {loading ? (
-                            <Typography>Loading...</Typography>
-                        ) : upcomingSchedules.length > 0 ? (
-                            <DataGrid
-                                rows={upcomingSchedules.map((schedule) => ({
-                                    id: schedule.mentoring_session_id,
-                                    sessionDetails: `Mentoring Session for ${
-                                        schedule.team_name || "Unknown SE"
-                                    } with Mentor ${
-                                        schedule.mentor_name || "Unknown Mentor"
-                                    }`,
-                                    date: `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` || "N/A",
-                                    time: schedule.mentoring_session_time || "N/A",
-                                    zoom: schedule.zoom_link || "N/A",
-                                    mentorship_id: schedule.mentorship_id,
-                                    status: schedule.status || "Pending",
-                                }))}
-                                sx={{
-                                  "& .MuiDataGrid-cell": {
-                                    display: "flex",
-                                    alignItems: "center",
-                                    paddingTop: "12px",
-                                    paddingBottom: "12px",
-                                  },
-                                  "& .MuiDataGrid-cellContent": {
-                                    whiteSpace: "normal",
-                                    wordBreak: "break-word",
-                                  },
-                                }}
-                                getRowHeight={() => 'auto'}
-                                columns={upcomingAcceptedSchedColumn}
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10]}
-                            />
-                        ) : (
-                            <Typography>No pending schedules available.</Typography>
-                        )}
-                    </Box>
-                </Box>
-            </>
-        )}
-
-        {/* --- */}
-
-        {/* COMMON DIALOGS AND SNACKBARS (rendered outside the conditional logic) */}
-        <Dialog
-            open={openDialog}
-            onClose={() => setOpenDialog(false)}
-            maxWidth="md"
-            fullWidth
-            PaperProps={{
-                style: {
-                    backgroundColor: "#fff",
-                    color: "#000",
-                    border: "1px solid #000",
-                },
-            }}
-        >
-            {/* Title with DLSU Green Background */}
-            <DialogTitle
+                  </Box>
+                }
+                icon={
+                  <BusinessIcon
+                    sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                  />
+                }
                 sx={{
-                    backgroundColor: "#1E4D2B",
-                    color: "#fff",
-                    textAlign: "center",
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
+                  p: "10px",
+                  backgroundColor: colors.primary[400],
+                  color: colors.grey[100],
+                  "& .MuiChip-icon": { color: colors.greenAccent[500] },
+                  maxWidth: "200px", // more width to fit longer words
+                  whiteSpace: "normal", // allow wrapping between lines
                 }}
-            >
-                View Evaluation
-            </DialogTitle>
+              />
+            </Box>
 
-            {/* Content Section */}
-            <DialogContent
+            {/* Total Programs (LSEED) */}
+            <Box
+              gridColumn="span 3"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              bgcolor={colors.primary[400]}
+            >
+              <Chip
+                label={`${stats.totalPrograms} LSEED ${
+                  stats.totalPrograms === 1 ? "Program" : "Programs"
+                }`}
+                icon={
+                  <SchoolIcon
+                    sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                  />
+                }
                 sx={{
-                    padding: "24px",
-                    maxHeight: "70vh",
-                    overflowY: "auto",
+                  fontSize: "20px",
+                  p: "10px",
+                  backgroundColor: colors.primary[400],
+                  color: colors.grey[100],
+                  "& .MuiChip-icon": { color: colors.greenAccent[500] },
                 }}
+              />
+            </Box>
+
+            {/* SE Performance Trend Chart */}
+            <Box
+              gridColumn="span 12"
+              gridRow="span 3"
+              bgcolor={colors.primary[400]}
+              paddingTop={2}
+              paddingLeft={2}
+              paddingright={2}
             >
-                {selectedEvaluation ? (
-                    <>
-                        {/* Evaluator, Social Enterprise, and Evaluation Date */}
-                        <Box
-                            sx={{
-                                marginBottom: "16px",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "8px",
-                            }}
-                        >
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: "bold",
-                                    borderBottom: "1px solid #000",
-                                    paddingBottom: "8px",
-                                }}
-                            >
-                                Evaluator: {selectedEvaluation.evaluator_name}{" "}
-                            </Typography>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: "bold",
-                                    borderBottom: "1px solid #000",
-                                    paddingBottom: "8px",
-                                }}
-                            >
-                                Social Enterprise Evaluated:{" "}
-                                {selectedEvaluation.social_enterprise}
-                            </Typography>
-                            <Typography variant="subtitle1" sx={{ color: "#000" }}>
-                                Evaluation Date: {selectedEvaluation.evaluation_date}
-                            </Typography>
-                        </Box>
+              <SEPerformanceTrendChart userRole={user?.roles} />
+            </Box>
 
-                        {/* Categories Section */}
-                        {selectedEvaluation.categories &&
-                            selectedEvaluation.categories.length > 0 ? (
-                            selectedEvaluation.categories.map((category, index) => (
-                                <Box
-                                    key={index}
-                                    sx={{
-                                        marginBottom: "24px",
-                                        padding: "16px",
-                                        border: "1px solid #000",
-                                        borderRadius: "8px",
-                                    }}
-                                >
-                                    {/* Category Name and Rating */}
-                                    <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                            fontWeight: "bold",
-                                            marginBottom: "8px",
-                                        }}
-                                    >
-                                        {category.category_name} - Rating:{" "}
-                                        {category.star_rating} ★
-                                    </Typography>
-
-                                    {/* Selected Comments */}
-                                    <Typography
-                                        variant="body1"
-                                        sx={{ marginBottom: "8px" }}
-                                    >
-                                        Comments:{" "}
-                                        {category.selected_comments.length > 0 ? (
-                                            category.selected_comments.join(", ")
-                                        ) : (
-                                            <i>No comments</i>
-                                        )}
-                                    </Typography>
-
-                                    {/* Additional Comment */}
-                                    <Typography variant="body1">
-                                        Additional Comment:{" "}
-                                        {category.additional_comment || (
-                                            <i>No additional comments</i>
-                                        )}
-                                    </Typography>
-                                </Box>
-                            ))
-                        ) : (
-                            <Typography variant="body1" sx={{ fontStyle: "italic" }}>
-                                No categories found for this evaluation.
-                            </Typography>
-                        )}
-                    </>
-                ) : (
-                    <Typography variant="body1" sx={{ fontStyle: "italic" }}>
-                        Loading evaluation details...
-                    </Typography>
-                )}
-            </DialogContent>
-
-            {/* Action Buttons */}
-            <DialogActions
-                sx={{ padding: "16px", borderTop: "1px solid #000" }}
+            {/* Left Section (Stat Boxes) */}
+            <Box
+              gridColumn="span 3"
+              gridRow="span 2"
+              display="grid"
+              gridTemplateRows="1fr 1fr"
+              gap={3}
+              borderRadius="8px"
             >
+              {/* Total Evaluations */}
+              <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                bgcolor={colors.primary[400]}
+                p={2}
+              >
+                <Chip
+                  label={`${evaluations.total} Total Evaluations`}
+                  icon={
+                    <PendingActionsIcon
+                      sx={{ fontSize: "26px", color: colors.blueAccent[500] }}
+                    />
+                  }
+                  sx={{
+                    fontSize: "20px",
+                    p: "10px",
+                    backgroundColor: colors.primary[400],
+                    color: colors.grey[100],
+                    "& .MuiChip-icon": { color: colors.blueAccent[500] },
+                  }}
+                />
+              </Box>
+
+              {/* Acknowledged Evaluations */}
+              <Box
+                bgcolor={colors.primary[400]}
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                p={2}
+              >
+                <StatBox
+                  title={evaluations.acknowledged}
+                  subtitle="Acknowledged Evaluations"
+                  increase={acknowledgedPercentage}
+                  icon={
+                    <AssignmentTurnedInIcon
+                      sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                    />
+                  }
+                />
+              </Box>
+            </Box>
+
+            {/* Right Section (Chart) */}
+            <Box
+              gridColumn="span 9"
+              gridRow="span 2"
+              bgcolor={colors.primary[400]}
+              p={2}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              height="100%"
+              minHeight="300px"
+              overflow="hidden"
+            >
+              <AcknowledgmentChart
+                style={{
+                  width: "200px",
+                  height: "200px",
+                  maxWidth: "400px",
+                  maxHeight: "300px",
+                  objectFit: "contain",
+                }}
+              />
+            </Box>
+
+            {/* Alert & Schedule Sections */}
+            <Box
+              gridColumn="span 12"
+              gridRow="span 3"
+              display="grid"
+              gridTemplateColumns="repeat(12, 1fr)"
+              gap="20px"
+            >
+              {/* SEs Requiring Immediate Attention 🚨 */}
+              <Box
+                gridColumn="span 6"
+                backgroundColor={colors.primary[400]}
+                padding="20px"
+              >
+                <Typography
+                  variant="h3"
+                  fontWeight="bold"
+                  color={colors.redAccent[500]}
+                  marginBottom="15px"
+                >
+                  SEs Requiring Immediate Attention
+                </Typography>
+                <Box
+                  sx={{
+                    height: "400px",
+                    minHeight: "400px",
+                    backgroundColor: colors.primary[400],
+                    "& .MuiDataGrid-root": { border: "none" },
+                    "& .MuiDataGrid-cell": { borderBottom: "none" },
+                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
+                      {
+                        backgroundColor: colors.blueAccent[700] + " !important",
+                      },
+                    "& .MuiDataGrid-virtualScroller": {
+                      backgroundColor: colors.primary[400],
+                    },
+                    "& .MuiDataGrid-footerContainer": {
+                      borderTop: "none",
+                      backgroundColor: colors.blueAccent[700],
+                      color: colors.grey[100],
+                    },
+                  }}
+                >
+                  {loading ? (
+                    <Typography>Loading...</Typography>
+                  ) : (
+                    <DataGrid rows={lowPerformingSEs} columns={alertColumns} />
+                  )}
+                </Box>
+              </Box>
+
+              {/* Pending Mentoring Schedules 🕒 */}
+              <Box
+                gridColumn="span 6"
+                backgroundColor={colors.primary[400]}
+                padding="20px"
+              >
+                <Typography
+                  variant="h3"
+                  fontWeight="bold"
+                  color={colors.blueAccent[500]}
+                  marginBottom="15px"
+                >
+                  Pending Mentoring Schedules
+                </Typography>
+                <Box
+                  sx={{
+                    height: "400px",
+                    minHeight: "400px",
+                    backgroundColor: colors.primary[400],
+                    "& .MuiDataGrid-root": { border: "none" },
+                    "& .MuiDataGrid-cell": { borderBottom: "none" },
+                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
+                      {
+                        backgroundColor: colors.blueAccent[700] + " !important",
+                      },
+                    "& .MuiDataGrid-virtualScroller": {
+                      backgroundColor: colors.primary[400],
+                    },
+                    "& .MuiDataGrid-footerContainer": {
+                      borderTop: "none",
+                      backgroundColor: colors.blueAccent[700],
+                      color: colors.grey[100],
+                    },
+                  }}
+                >
+                  {loading ? (
+                    <Typography>Loading...</Typography>
+                  ) : mentorSchedules.length > 0 ? (
+                    <DataGrid
+                      rows={mentorSchedules.map((schedule) => ({
+                        id: schedule.mentoring_session_id,
+                        sessionDetails: `Mentoring Session for ${
+                          schedule.team_name || "Unknown SE"
+                        } with Mentor ${
+                          schedule.mentor_name || "Unknown Mentor"
+                        }`,
+                        date:
+                          `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` ||
+                          "N/A",
+                        time: schedule.mentoring_session_time || "N/A",
+                        zoom: schedule.zoom_link || "N/A",
+                        mentorship_id: schedule.mentorship_id,
+                        status: schedule.status || "Pending",
+                        realDate: schedule.mentoring_session_date || "N/A", // for backend
+                        realTime: schedule.mentoring_session_time || "N/A", // for backend
+                      }))}
+                      sx={{
+                        "& .MuiDataGrid-cell": {
+                          display: "flex",
+                          alignItems: "center",
+                          paddingTop: "12px",
+                          paddingBottom: "12px",
+                        },
+                        "& .MuiDataGrid-cellContent": {
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
+                        },
+                      }}
+                      getRowHeight={() => "auto"}
+                      columns={pendingScheduleColumns}
+                      pageSize={5}
+                      rowsPerPageOptions={[5, 10]}
+                    />
+                  ) : (
+                    <Typography>No pending schedules available.</Typography>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Quick Action Panel */}
+            <Box
+              gridColumn="span 12"
+              gridRow="span 1"
+              bgcolor={colors.primary[400]}
+              padding="20px"
+              marginTop={3}
+            >
+              <Typography
+                variant="h4"
+                fontWeight="bold"
+                color={colors.greenAccent[500]}
+                marginBottom="15px"
+              >
+                Quick Actions Panel
+              </Typography>
+
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                gap={2}
+                width="100%"
+              >
                 <Button
-                    onClick={() => setOpenDialog(false)}
-                    sx={{
-                        color: "#000",
-                        border: "1px solid #000",
-                        "&:hover": { backgroundColor: "#f0f0f0" },
-                    }}
+                  variant="contained"
+                  startIcon={<AnalyticsOutlinedIcon />}
+                  onClick={() => navigate("/analytics")}
+                  sx={{
+                    flexGrow: 1,
+                    backgroundColor: colors.blueAccent[800],
+                    color: colors.grey[100],
+                    "&:hover": {
+                      backgroundColor: colors.blueAccent[900],
+                    },
+                  }}
                 >
-                    Close
+                  View Analytics
                 </Button>
-            </DialogActions>
-        </Dialog>
+                <Button
+                  variant="contained"
+                  startIcon={<Diversity2OutlinedIcon />}
+                  onClick={() => navigate("/socialenterprise")}
+                  sx={{
+                    flexGrow: 1,
+                    backgroundColor: colors.blueAccent[600],
+                    color: colors.grey[100],
+                    "&:hover": {
+                      backgroundColor: colors.blueAccent[700],
+                    },
+                  }}
+                >
+                  Social Enterprises
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AssignmentTurnedInOutlinedIcon />}
+                  onClick={() => navigate("/assess")}
+                  sx={{
+                    flexGrow: 1,
+                    backgroundColor: colors.greenAccent[600],
+                    color: colors.grey[100],
+                    "&:hover": {
+                      backgroundColor: colors.greenAccent[800],
+                    },
+                  }}
+                >
+                  Evaluate Mentor
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Mentorships Section */}
+            <Box gridColumn="span 12" gridRow="span 3" display="grid">
+              <Box
+                gridColumn="span 12"
+                backgroundColor={colors.primary[400]}
+                padding="20px"
+              >
+                <Typography
+                  variant="h3"
+                  fontWeight="bold"
+                  color={colors.greenAccent[500]}
+                  marginBottom="15px"
+                >
+                  Mentorships
+                </Typography>
+                <Box
+                  sx={{
+                    height: "400px",
+                    minHeight: "400px",
+                    backgroundColor: colors.primary[400],
+                    "& .MuiDataGrid-root": { border: "none" },
+                    "& .MuiDataGrid-cell": { borderBottom: "none" },
+                    "& .name-column--cell": { color: colors.greenAccent[300] },
+                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
+                      {
+                        backgroundColor: colors.blueAccent[700] + " !important",
+                      },
+                    "& .MuiDataGrid-virtualScroller": {
+                      backgroundColor: colors.primary[400],
+                    },
+                    "& .MuiDataGrid-footerContainer": {
+                      borderTop: "none",
+                      backgroundColor: colors.blueAccent[700],
+                      color: colors.grey[100],
+                    },
+                  }}
+                >
+                  {loading ? (
+                    <Typography>Loading...</Typography>
+                  ) : (
+                    <DataGrid rows={socialEnterprises} columns={columns} />
+                  )}
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        </>
+      ) : (
+        // =========================
+        // === MENTOR VIEW LAYOUT ===
+        // =========================
+        <>
+          {/* Row 1 - StatBoxes */}
+          <Box
+            display="flex"
+            flexWrap="wrap"
+            gap="20px"
+            justifyContent="space-between"
+            mt="20px"
+          >
+            {/* Total Evaluations Submitted */}
+            <Box
+              flex="1 1 22%"
+              backgroundColor={colors.primary[400]}
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              p="20px"
+            >
+              <AssignmentTurnedInOutlinedIcon
+                sx={{ fontSize: 40, color: colors.greenAccent[500], mb: 1 }}
+              />
+              <Typography
+                variant="h4"
+                fontWeight="bold"
+                color={colors.grey[100]}
+              >
+                {mentorDashboardStats?.totalEvalMade ?? 0}
+              </Typography>
+              <Typography variant="subtitle2" color={colors.grey[300]}>
+                Total Evaluations Submitted
+              </Typography>
+            </Box>
+
+            {/* Average Rating Given to SEs */}
+            <Box
+              flex="1 1 22%"
+              backgroundColor={colors.primary[400]}
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              p="20px"
+            >
+              <Star
+                sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }}
+              />
+              <Typography
+                variant="h4"
+                fontWeight="bold"
+                color={colors.grey[100]}
+              >
+                {(mentorDashboardStats?.avgRatingGiven ?? 0).toFixed(2)}
+              </Typography>
+              <Typography variant="subtitle2" color={colors.grey[300]}>
+                Average Rating Given to SEs
+              </Typography>
+            </Box>
+
+            {/* Most Common Rating */}
+            <Box
+              flex="1 1 22%"
+              backgroundColor={colors.primary[400]}
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              p="20px"
+            >
+              <Star
+                sx={{ fontSize: 40, color: colors.redAccent[500], mb: 1 }}
+              />
+              <Typography
+                variant="h4"
+                fontWeight="bold"
+                color={colors.grey[100]}
+              >
+                {mentorDashboardStats?.mostCommonRating ?? 0}
+              </Typography>
+              <Typography variant="subtitle2" color={colors.grey[300]}>
+                Most Common Rating
+              </Typography>
+            </Box>
+
+            {/* Social Enterprises Handled */}
+            <Box
+              flex="1 1 22%"
+              backgroundColor={colors.primary[400]}
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              p="20px"
+            >
+              <Diversity2OutlinedIcon
+                sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }}
+              />
+              <Typography
+                variant="h4"
+                fontWeight="bold"
+                color={colors.grey[100]}
+              >
+                {mentorDashboardStats?.mentorshipsCount ?? 0}
+              </Typography>
+              <Typography variant="subtitle2" color={colors.grey[300]}>
+                Social Enterprises Handled
+              </Typography>
+            </Box>
+          </Box>
+          {/* Recent Evaluations */}
+          <Box
+            width="100%"
+            backgroundColor={colors.primary[400]}
+            padding="20px"
+            mt={4}
+          >
+            <Typography
+              variant="h3"
+              fontWeight="bold"
+              color={colors.greenAccent[500]}
+              marginBottom="15px"
+            >
+              Recent Evaluations
+            </Typography>
+
+            {mentorEvaluations.length > 0 ? (
+              <Box
+                height="400px"
+                minHeight="400px"
+                sx={{
+                  "& .MuiDataGrid-root": { border: "none" },
+                  "& .MuiDataGrid-cell": { borderBottom: "none" },
+                  "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                    backgroundColor: colors.blueAccent[700] + " !important",
+                  },
+                  "& .MuiDataGrid-virtualScroller": {
+                    backgroundColor: colors.primary[400],
+                  },
+                  "& .MuiDataGrid-footerContainer": {
+                    borderTop: "none",
+                    backgroundColor: colors.blueAccent[700],
+                    color: colors.grey[100],
+                  },
+                }}
+              >
+                <DataGrid
+                  rows={mentorEvaluations}
+                  columns={mentorColumns}
+                  pageSize={5}
+                  rowsPerPageOptions={[5, 10]}
+                  getRowHeight={() => "auto"}
+                  // REFERERENCE for GridToolbar
+                  sx={{
+                    "& .MuiDataGrid-cell": {
+                      display: "flex",
+                      alignItems: "center", // vertical centering
+                      paddingTop: "12px",
+                      paddingBottom: "12px",
+                    },
+                    "& .MuiDataGrid-columnHeader": {
+                      alignItems: "center", // optional: center header label vertically
+                    },
+                    "& .MuiDataGrid-cellContent": {
+                      whiteSpace: "normal", // allow line wrap
+                      wordBreak: "break-word",
+                    },
+                    "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
+                      color: `${colors.grey[100]} !important`,
+                    },
+                  }}
+                  slots={{ toolbar: GridToolbar }}
+                />
+              </Box>
+            ) : (
+              <Typography>No evaluations available.</Typography>
+            )}
+          </Box>
+
+          {/* Quick Action Panel */}
+          <Box
+            gridColumn="span 12"
+            gridRow="span 1"
+            bgcolor={colors.primary[400]}
+            padding="20px"
+            marginTop={3}
+          >
+            <Typography
+              variant="h4"
+              fontWeight="bold"
+              color={colors.greenAccent[500]}
+              marginBottom="15px"
+            >
+              Quick Actions Panel
+            </Typography>
+
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              gap={2}
+              width="100%"
+            >
+              <Button
+                variant="contained"
+                startIcon={<SupervisorAccountOutlinedIcon />}
+                onClick={() => navigate("/mentorships")}
+                sx={{
+                  flexGrow: 1,
+                  backgroundColor: colors.blueAccent[800],
+                  color: colors.grey[100],
+                  "&:hover": {
+                    backgroundColor: colors.blueAccent[900],
+                  },
+                }}
+              >
+                Manage Mentorships
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<CalendarMonthOutlinedIcon />}
+                onClick={() => navigate("/scheduling")}
+                sx={{
+                  flexGrow: 1,
+                  backgroundColor: colors.blueAccent[600],
+                  color: colors.grey[100],
+                  "&:hover": {
+                    backgroundColor: colors.blueAccent[700],
+                  },
+                }}
+              >
+                Appoint a Schedule
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AssignmentTurnedInOutlinedIcon />}
+                onClick={() => navigate("/assess")}
+                sx={{
+                  flexGrow: 1,
+                  backgroundColor: colors.greenAccent[600],
+                  color: colors.grey[100],
+                  "&:hover": {
+                    backgroundColor: colors.greenAccent[800],
+                  },
+                }}
+              >
+                Evaluate Social Enterprises
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Upcoming Mentoring Sessions */}
+          <Box
+            width="100%"
+            backgroundColor={colors.primary[400]}
+            padding="20px"
+            mt={4}
+          >
+            <Typography
+              variant="h3"
+              fontWeight="bold"
+              color={colors.greenAccent[500]}
+              marginBottom="15px"
+            >
+              Upcoming Mentoring Sessions
+            </Typography>
+            <Box
+              sx={{
+                height: "400px",
+                minHeight: "400px",
+                backgroundColor: colors.primary[400],
+                "& .MuiDataGrid-root": { border: "none" },
+                "& .MuiDataGrid-cell": { borderBottom: "none" },
+                "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                  backgroundColor: colors.blueAccent[700] + " !important",
+                },
+                "& .MuiDataGrid-virtualScroller": {
+                  backgroundColor: colors.primary[400],
+                },
+                "& .MuiDataGrid-footerContainer": {
+                  borderTop: "none",
+                  backgroundColor: colors.blueAccent[700],
+                  color: colors.grey[100],
+                },
+              }}
+            >
+              {loading ? (
+                <Typography>Loading...</Typography>
+              ) : upcomingSchedules.length > 0 ? (
+                <DataGrid
+                  rows={upcomingSchedules.map((schedule) => ({
+                    id: schedule.mentoring_session_id,
+                    sessionDetails: `Mentoring Session for ${
+                      schedule.team_name || "Unknown SE"
+                    } with Mentor ${schedule.mentor_name || "Unknown Mentor"}`,
+                    date:
+                      `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` ||
+                      "N/A",
+                    time: schedule.mentoring_session_time || "N/A",
+                    zoom: schedule.zoom_link || "N/A",
+                    mentorship_id: schedule.mentorship_id,
+                    status: schedule.status || "Pending",
+                  }))}
+                  sx={{
+                    "& .MuiDataGrid-cell": {
+                      display: "flex",
+                      alignItems: "center",
+                      paddingTop: "12px",
+                      paddingBottom: "12px",
+                    },
+                    "& .MuiDataGrid-cellContent": {
+                      whiteSpace: "normal",
+                      wordBreak: "break-word",
+                    },
+                  }}
+                  getRowHeight={() => "auto"}
+                  columns={upcomingAcceptedSchedColumn}
+                  pageSize={5}
+                  rowsPerPageOptions={[5, 10]}
+                />
+              ) : (
+                <Typography>No pending schedules available.</Typography>
+              )}
+            </Box>
+          </Box>
+        </>
+      )}
+
+      {/* --- */}
+
+      {/* COMMON DIALOGS AND SNACKBARS (rendered outside the conditional logic) */}
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          style: {
+            backgroundColor: "#fff",
+            color: "#000",
+            border: "1px solid #000",
+          },
+        }}
+      >
+        {/* Title with DLSU Green Background */}
+        <DialogTitle
+          sx={{
+            backgroundColor: "#1E4D2B",
+            color: "#fff",
+            textAlign: "center",
+            fontSize: "1.5rem",
+            fontWeight: "bold",
+          }}
+        >
+          View Evaluation
+        </DialogTitle>
+
+        {/* Content Section */}
+        <DialogContent
+          sx={{
+            padding: "24px",
+            maxHeight: "70vh",
+            overflowY: "auto",
+          }}
+        >
+          {selectedEvaluation ? (
+            <>
+              {/* Evaluator, Social Enterprise, and Evaluation Date */}
+              <Box
+                sx={{
+                  marginBottom: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: "bold",
+                    borderBottom: "1px solid #000",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  Evaluator: {selectedEvaluation.evaluator_name}{" "}
+                </Typography>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: "bold",
+                    borderBottom: "1px solid #000",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  Social Enterprise Evaluated:{" "}
+                  {selectedEvaluation.social_enterprise}
+                </Typography>
+                <Typography variant="subtitle1" sx={{ color: "#000" }}>
+                  Evaluation Date: {selectedEvaluation.evaluation_date}
+                </Typography>
+              </Box>
+
+              {/* Categories Section */}
+              {selectedEvaluation.categories &&
+              selectedEvaluation.categories.length > 0 ? (
+                selectedEvaluation.categories.map((category, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      marginBottom: "24px",
+                      padding: "16px",
+                      border: "1px solid #000",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    {/* Category Name and Rating */}
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: "bold",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {category.category_name} - Rating: {category.star_rating}{" "}
+                      ★
+                    </Typography>
+
+                    {/* Selected Comments */}
+                    <Typography variant="body1" sx={{ marginBottom: "8px" }}>
+                      Comments:{" "}
+                      {category.selected_comments.length > 0 ? (
+                        category.selected_comments.join(", ")
+                      ) : (
+                        <i>No comments</i>
+                      )}
+                    </Typography>
+
+                    {/* Additional Comment */}
+                    <Typography variant="body1">
+                      Additional Comment:{" "}
+                      {category.additional_comment || (
+                        <i>No additional comments</i>
+                      )}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body1" sx={{ fontStyle: "italic" }}>
+                  No categories found for this evaluation.
+                </Typography>
+              )}
+            </>
+          ) : (
+            <Typography variant="body1" sx={{ fontStyle: "italic" }}>
+              Loading evaluation details...
+            </Typography>
+          )}
+        </DialogContent>
+
+        {/* Action Buttons */}
+        <DialogActions sx={{ padding: "16px", borderTop: "1px solid #000" }}>
+          <Button
+            onClick={() => setOpenDialog(false)}
+            sx={{
+              color: "#000",
+              border: "1px solid #000",
+              "&:hover": { backgroundColor: "#f0f0f0" },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
-);
+  );
 };
 
 export default Dashboard;

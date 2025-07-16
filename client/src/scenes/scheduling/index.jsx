@@ -61,7 +61,9 @@ const Scheduling = ({}) => {
   const colors = tokens(theme.palette.mode);
   const [selectedTime, setSelectedTime] = useState(dayjs().startOf("hour"));
   const now = dayjs();
-  {/* REFERENCE DELETE THIS LATER ON FOR SNACKBAR */}
+  {
+    /* REFERENCE DELETE THIS LATER ON FOR SNACKBAR */
+  }
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
@@ -102,14 +104,8 @@ const Scheduling = ({}) => {
   const timeSlots = generateTimeSlots();
 
   const handleAcceptClick = async (schedule) => {
-   try {
-      const {
-        id,
-        mentorship_id,
-        realDate,
-        realTime,
-        zoom,
-      } = schedule;
+    try {
+      const { id, mentorship_id, realDate, realTime, zoom } = schedule;
 
       const response = await fetch(
         `${process.env.REACT_APP_API_BASE_URL}/approveMentorship`,
@@ -380,14 +376,11 @@ const Scheduling = ({}) => {
               }
             );
             const program = programRes.data[0]?.name;
-            lseedResponse = await axiosClient.get(
-              `/api/get-mentor-schedules`,
-              { params: { program } }
-            );
+            lseedResponse = await axiosClient.get(`/api/get-mentor-schedules`, {
+              params: { program },
+            });
           } else {
-            lseedResponse = await axiosClient.get(
-              `/api/get-mentor-schedules`
-            );
+            lseedResponse = await axiosClient.get(`/api/get-mentor-schedules`);
           }
           setLseedHistory(lseedResponse.data || []);
         }
@@ -422,9 +415,9 @@ const Scheduling = ({}) => {
     try {
       setIsLoading(true);
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/getMentorshipsbyID?mentor_id=${encodeURIComponent(user.id)}`
-      );
+      const response = await axiosClient.get(`/api/mentorships-by-id`, {
+        params: { mentor_id: user.id },
+      });
       const data = await response.json();
 
       console.log("📥 Received Data in Scheduling:", data);
@@ -439,8 +432,9 @@ const Scheduling = ({}) => {
 
       for (const se of data) {
         try {
-          const checkResponse = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/checkTelegramRegistration?mentor_id=${encodeURIComponent(se.mentor_id)}&se_id=${encodeURIComponent(se.se_id)}`
+          const checkResponse = await axiosClient.get(
+            `/api/check-telegram-registration`,
+            { params: { mentor_id: se.mentor_id, se_id: se.se_id } }
           );
           const checkData = await checkResponse.json();
 
@@ -453,7 +447,7 @@ const Scheduling = ({}) => {
             sdg_name: se.sdgs || "No SDG Name",
             preferred_times: se.preferred_mentoring_time || [],
             time_note: se.mentoring_time_note || "No Time Note",
-            telegramRegistered: checkData.exists || false
+            telegramRegistered: checkData.exists || false,
           });
         } catch (error) {
           console.error("Error checking telegram registration:", error);
@@ -468,7 +462,7 @@ const Scheduling = ({}) => {
             sdg_name: se.sdgs || "No SDG Name",
             preferred_times: se.preferred_mentoring_time || [],
             time_note: se.mentoring_time_note || "No Time Note",
-            telegramRegistered: false
+            telegramRegistered: false,
           });
         }
       }
@@ -480,7 +474,6 @@ const Scheduling = ({}) => {
       setIsLoading(false);
     }
   };
-
 
   const handleConfirmDate = async () => {
     console.log("SE ID:", selectedSE?.id);
@@ -497,7 +490,9 @@ const Scheduling = ({}) => {
       !endTime ||
       !zoomLink
     ) {
-      setSnackbarMessage("All fields are required: SE, Date, Start Time, End Time, Zoom Link.");
+      setSnackbarMessage(
+        "All fields are required: SE, Date, Start Time, End Time, Zoom Link."
+      );
       setSnackbarSeverity("error");
       setSnackbarOpen(true);
       return;
@@ -507,7 +502,8 @@ const Scheduling = ({}) => {
       setIsLoading(true);
 
       const teamName = selectedSE?.team_name || "Selected SE";
-      const displayDate = selectedDate?.format("MMMM D, YYYY") || "selected date";
+      const displayDate =
+        selectedDate?.format("MMMM D, YYYY") || "selected date";
       const displayStartTime = startTime?.format("HH:mm") || "start time";
       const displayEndTime = endTime?.format("HH:mm") || "end time";
 
@@ -517,7 +513,9 @@ const Scheduling = ({}) => {
         : null;
       const formattedStartTime =
         selectedDate?.isValid?.() && startTime?.isValid?.()
-          ? `${selectedDate.format("YYYY-MM-DD")} ${startTime.format("HH:mm:ss")}`
+          ? `${selectedDate.format("YYYY-MM-DD")} ${startTime.format(
+              "HH:mm:ss"
+            )}`
           : null;
 
       const formattedEndTime =
@@ -531,9 +529,13 @@ const Scheduling = ({}) => {
 
       // ✅ Check that start time is not in the past
       const now = dayjs();
-      const selectedStart = dayjs(`${formattedDate} ${startTime.format("HH:mm:ss")}`);
+      const selectedStart = dayjs(
+        `${formattedDate} ${startTime.format("HH:mm:ss")}`
+      );
       if (selectedStart.isBefore(now)) {
-        setSnackbarMessage("Start time must not be in the past. Please choose a future time.");
+        setSnackbarMessage(
+          "Start time must not be in the past. Please choose a future time."
+        );
         setSnackbarSeverity("error");
         setSnackbarOpen(true);
         setIsLoading(false);
@@ -727,15 +729,13 @@ const Scheduling = ({}) => {
 
           const program = res.data[0]?.name;
 
-          response = await axiosClient.get(`/api/pending-schedules`,{ 
+          response = await axiosClient.get(`/api/pending-schedules`, {
             params: { program },
           });
         } else {
-          response = await axiosClient.get(
-            `/api/pending-schedules`
-          );
+          response = await axiosClient.get(`/api/pending-schedules`);
         }
-        const data = response.data; 
+        const data = response.data;
 
         console.log("📅 Mentor Schedules Data:", data); // ✅ Debugging log
 
@@ -784,7 +784,6 @@ const Scheduling = ({}) => {
         >
           {/* Open LSEED Calendar Button */}
           {/* Visible if user has any LSEED role AND (is not a mentor OR is in coordinator view) */}
-            
 
           {/* Schedule a Mentoring Session Button */}
           {/* Visible if user has Mentor role AND (is not an LSEED user OR is in mentor view) */}
@@ -895,8 +894,8 @@ const Scheduling = ({}) => {
                     zoom: schedule.zoom_link || "N/A",
                     mentorship_id: schedule.mentorship_id,
                     status: schedule.status || "Pending",
-                    realDate: schedule.mentoring_session_date || "N/A",     // for backend
-                    realTime: schedule.mentoring_session_time || "N/A",     // for backend
+                    realDate: schedule.mentoring_session_date || "N/A", // for backend
+                    realTime: schedule.mentoring_session_time || "N/A", // for backend
                   }))}
                   columns={[
                     {
@@ -1478,7 +1477,9 @@ const Scheduling = ({}) => {
                             {se.program_name}
                             <br />
                             <strong>Preferred Times:</strong>{" "}
-                            {se.preferred_times.length > 0 ? se.preferred_times.join(", ") : "None"}
+                            {se.preferred_times.length > 0
+                              ? se.preferred_times.join(", ")
+                              : "None"}
                             <br />
                             <strong>Time Notes:</strong> {se.time_note}
                             <br />
@@ -1492,13 +1493,15 @@ const Scheduling = ({}) => {
                                   fontWeight: "bold",
                                 }}
                               >
-                                Please let the social enterprise register in Telegram.
+                                Please let the social enterprise register in
+                                Telegram.
                               </Typography>
                             )}
                           </Box>
                         }
                         primaryTypographyProps={{
-                          fontWeight: selectedSE?.id === se.id ? "bold" : "normal",
+                          fontWeight:
+                            selectedSE?.id === se.id ? "bold" : "normal",
                           color: "black",
                         }}
                         secondaryTypographyProps={{

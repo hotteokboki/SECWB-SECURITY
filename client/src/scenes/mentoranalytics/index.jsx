@@ -40,8 +40,8 @@ const MentorAnalytics = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/mentor-analytics/${selectedMentorId}`
+        const response = await axiosClient.get(
+          `/api/mentor-analytics/${selectedMentorId}`
         );
         const data = await response.json();
 
@@ -56,13 +56,12 @@ const MentorAnalytics = () => {
         });
 
         // ✅ Fetch mentor critical areas
-        const areasResponse = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/mentor-critical-areas/${selectedMentorId}`
+        const areasResponse = await axiosClient.get(
+          `/api/mentor-critical-areas/${selectedMentorId}`
         );
         const areasData = await areasResponse.json();
 
         setCriticalAreas(areasData.criticalAreas || []);
-        
       } catch (error) {
         console.error("❌ Error fetching analytics stats:", error);
       }
@@ -78,9 +77,9 @@ const MentorAnalytics = () => {
       try {
         setIsLoadingEvaluations(true);
 
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_BASE_URL}/getMentorEvaluationsByMentorID`,
-          { params: { mentor_id: id } } // ✅ Correct query parameter usage
+        const response = await axiosClient.get(
+          `/api/mentor-evaluations-by-mentor-id`,
+          { params: { mentor_id: id } }
         );
 
         const data = response.data; // ✅ Axios already returns JSON, no need for .json()
@@ -114,13 +113,23 @@ const MentorAnalytics = () => {
 
   const columns = [
     { field: "mentor_name", headerName: "Mentor", flex: 1, minWidth: 150 },
-    { field: "evaluator_name", headerName: "Evaluator (SE)", flex: 1, minWidth: 150 },
-    { field: "evaluation_date", headerName: "Evaluation Date", flex: 1, minWidth: 150 },
+    {
+      field: "evaluator_name",
+      headerName: "Evaluator (SE)",
+      flex: 1,
+      minWidth: 150,
+    },
+    {
+      field: "evaluation_date",
+      headerName: "Evaluation Date",
+      flex: 1,
+      minWidth: 150,
+    },
     {
       field: "action",
       headerName: "Action",
       flex: 1,
-      minWidth: 150,  
+      minWidth: 150,
       renderCell: (params) => (
         <Button
           variant="contained"
@@ -137,8 +146,8 @@ const MentorAnalytics = () => {
     console.log("📌 Evaluation ID Passed:", evaluation_id); // Debugging log
 
     try {
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_BASE_URL}/getEvaluationDetailsForMentorEvaluation`,
+      const response = await axiosClient.get(
+        `/api/evaluation-details-for-mentor-evaluation`,
         { params: { evaluation_id } }
       );
 
@@ -343,7 +352,7 @@ const MentorAnalytics = () => {
         </Box>
 
         {/* Chart Container */}
-        <Box 
+        <Box
           display="flex"
           flexDirection="column"
           gap={3}
@@ -394,27 +403,27 @@ const MentorAnalytics = () => {
             rows={evaluationsData}
             columns={columns}
             getRowId={(row) => row.id}
-            getRowHeight={() => 'auto'}
+            getRowHeight={() => "auto"}
             sx={{
-                "& .MuiDataGrid-cell": {
-                  display: "flex",
-                  alignItems: "center", // vertical centering
-                  paddingTop: "12px",
-                  paddingBottom: "12px",
-                },
-                "& .MuiDataGrid-columnHeader": {
-                  alignItems: "center", // optional: center header label vertically
-                },
-                "& .MuiDataGrid-cellContent": {
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
-                  overflowWrap: "break-word",
-                },
-                "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
+              "& .MuiDataGrid-cell": {
+                display: "flex",
+                alignItems: "center", // vertical centering
+                paddingTop: "12px",
+                paddingBottom: "12px",
+              },
+              "& .MuiDataGrid-columnHeader": {
+                alignItems: "center", // optional: center header label vertically
+              },
+              "& .MuiDataGrid-cellContent": {
+                whiteSpace: "normal",
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
+              },
+              "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
                 color: `${colors.grey[100]} !important`,
-                },
-              }}
-              slots={{ toolbar: GridToolbar }}
+              },
+            }}
+            slots={{ toolbar: GridToolbar }}
           />
         </Box>
 
@@ -475,7 +484,6 @@ const MentorAnalytics = () => {
               </Box>
             ))}
           </Box>
-
         </Box>
       </Box>
 

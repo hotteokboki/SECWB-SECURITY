@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
-import { Box, Typography, Select, MenuItem, Tooltip, IconButton } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  Tooltip,
+  IconButton,
+} from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LineChart from "./LineChart";
 import { useTheme } from "@mui/material";
 import { tokens } from "../theme";
 import { useAuth } from "../context/authContext";
 
-const SEPerformanceTrendChart = ({selectedSEId = null}) => {
+const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const [topPerformers, setTopPerformers] = useState([]);
@@ -17,7 +24,7 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
   const isMentor = user?.roles?.includes("Mentor");
 
   // KEN MAY BUG DITO
-  // Sa debug lumalabas na true kahit ung mode ko sa system is mentor mode, dapat false na yan 
+  // Sa debug lumalabas na true kahit ung mode ko sa system is mentor mode, dapat false na yan
 
   useEffect(() => {
     const fetchTopPerformers = async () => {
@@ -25,25 +32,22 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
-
-          const data = await res.json();
-          const program = data[0]?.name; 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/top-se-performance?period=${period}&program=${program}`,
+          const res = await fetch(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
               method: "GET",
-              credentials: "include"
+              credentials: "include", // Required to send session cookie
             }
           );
+
+          const data = await res.json();
+          const program = data[0]?.name;
+          response = await axiosClient.get(`/api/top-se-performance`, {
+            params: { period, program },
+          });
         } else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/top-se-performance?period=${period}&se_id=${selectedSEId}`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
+          response = await axiosClient.get(`/api/top-se-performance`, {
+            params: { period, se_id: selectedSEId },
           });
         }
 
@@ -104,14 +108,16 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
     const allPeriodsSet = new Set();
     data.forEach(({ quarter_start }) => {
       const date = new Date(quarter_start);
-      const periodLabel = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+      const periodLabel = `${date.getFullYear()}-Q${
+        Math.floor(date.getMonth() / 3) + 1
+      }`;
       allPeriodsSet.add(periodLabel);
     });
 
     // 2. Sort quarters chronologically (by year and quarter number)
     const allPeriods = Array.from(allPeriodsSet).sort((a, b) => {
-      const [aYear, aQ] = a.split('-Q').map(Number);
-      const [bYear, bQ] = b.split('-Q').map(Number);
+      const [aYear, aQ] = a.split("-Q").map(Number);
+      const [bYear, bQ] = b.split("-Q").map(Number);
       if (aYear !== bYear) return aYear - bYear;
       return aQ - bQ;
     });
@@ -119,7 +125,9 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
     // 3. Group ratings by social_enterprise and quarter
     data.forEach(({ social_enterprise, quarter_start, avg_rating }) => {
       const date = new Date(quarter_start);
-      const periodLabel = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+      const periodLabel = `${date.getFullYear()}-Q${
+        Math.floor(date.getMonth() / 3) + 1
+      }`;
 
       if (!groupedData[social_enterprise]) {
         groupedData[social_enterprise] = {};
@@ -144,7 +152,7 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
 
   const chartData = formatChartData(topPerformers);
 
-  console.log("Chart Data: ", chartData)
+  console.log("Chart Data: ", chartData);
 
   return (
     <Box
@@ -192,24 +200,39 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
                 </Typography>
 
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  This chart visualizes how <strong>Social Enterprises (SEs)</strong> perform across quarters based on their mentor evaluation ratings.
+                  This chart visualizes how{" "}
+                  <strong>Social Enterprises (SEs)</strong> perform across
+                  quarters based on their mentor evaluation ratings.
                 </Typography>
 
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="body2">
-                    🔹 <strong style={{ color: colors.greenAccent[500] }}>Rising Line</strong> – The SE's average ratings have improved over time.
+                    🔹{" "}
+                    <strong style={{ color: colors.greenAccent[500] }}>
+                      Rising Line
+                    </strong>{" "}
+                    – The SE's average ratings have improved over time.
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    ⏸️ <strong style={{ color: colors.grey[300] }}>Flat Line</strong> – Performance remained stable across periods.
+                    ⏸️{" "}
+                    <strong style={{ color: colors.grey[300] }}>
+                      Flat Line
+                    </strong>{" "}
+                    – Performance remained stable across periods.
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    🔻 <strong style={{ color: "#f44336" }}>Falling Line</strong> – Ratings have declined, indicating challenges or lack of progress.
+                    🔻{" "}
+                    <strong style={{ color: "#f44336" }}>Falling Line</strong> –
+                    Ratings have declined, indicating challenges or lack of
+                    progress.
                   </Typography>
                 </Box>
 
                 <Typography variant="body2" sx={{ mt: 2 }}>
-                  The performance is based on <strong>average star ratings</strong> from mentor evaluations across key categories
-                  like Finance, Marketing, Logistics, and others.
+                  The performance is based on{" "}
+                  <strong>average star ratings</strong> from mentor evaluations
+                  across key categories like Finance, Marketing, Logistics, and
+                  others.
                 </Typography>
 
                 <Typography variant="body2" sx={{ mt: 1 }}>
@@ -217,15 +240,19 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
                 </Typography>
                 <Box sx={{ pl: 1 }}>
                   <Typography variant="body2">
-                    • A <strong>weighted average score</strong> is calculated using <em>average × number of evaluations</em>.
+                    • A <strong>weighted average score</strong> is calculated
+                    using <em>average × number of evaluations</em>.
                   </Typography>
                   <Typography variant="body2">
-                    • Only the <strong>Top 3 SEs</strong> (highest weighted average) are shown.
+                    • Only the <strong>Top 3 SEs</strong> (highest weighted
+                    average) are shown.
                   </Typography>
                 </Box>
 
                 <Typography variant="body2" sx={{ mt: 2 }}>
-                  Switch between <strong>Overall</strong>, <strong>Quarterly</strong>, and <strong>Yearly</strong> to compare performance over different time periods.
+                  Switch between <strong>Overall</strong>,{" "}
+                  <strong>Quarterly</strong>, and <strong>Yearly</strong> to
+                  compare performance over different time periods.
                 </Typography>
               </Box>
             }
@@ -236,7 +263,6 @@ const SEPerformanceTrendChart = ({selectedSEId = null}) => {
               <HelpOutlineIcon />
             </IconButton>
           </Tooltip>
-
         </Box>
 
         {/* Right side - Period Select Dropdown */}

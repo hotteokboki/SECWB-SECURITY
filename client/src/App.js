@@ -12,7 +12,6 @@ import Reports from "./scenes/reports";
 import Scheduling from "./scenes/scheduling";
 import EvaluatePage from "./scenes/assess";
 import SEAnalytics from "./scenes/seanalytics";
-import MentorAnalytics from "./scenes/mentoranalytics";
 import Mentorships from "./scenes/mentorships";
 import AuditLogs from "./scenes/audit-logs";
 import Unauthorized from "./scenes/unauthorized";
@@ -134,7 +133,6 @@ const MainContent = () => {
 
         <Route element={<ProtectedRoute allowedRoles={["Mentor"]} />}>
           <Route path="/mentorships" element={<Mentorships />} />
-          <Route path="/mentor-analytics/:id" element={<MentorAnalytics />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["Administrator", "LSEED-Director",]} />}>

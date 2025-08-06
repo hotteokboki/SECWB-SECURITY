@@ -211,13 +211,13 @@ const SocialEnterprise = ({}) => {
 
           const program = res.data[0]?.name;
 
-          response = await axios.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesWithMentorship`,
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesWithMentorship`,
             { params: { program } }
           );
         } else {
-          response = await axios.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesWithMentorship`
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesWithMentorship`
           );
         }
 

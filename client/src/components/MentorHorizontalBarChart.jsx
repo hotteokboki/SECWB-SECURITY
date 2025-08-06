@@ -2,6 +2,7 @@ import { ResponsiveBar } from "@nivo/bar";
 import { useTheme, Typography, Box, Button } from "@mui/material";
 import { tokens } from "../theme";
 import React, { useState, useEffect } from "react";
+import axiosClient from "../api/axiosClient";
 
 const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
   const theme = useTheme();

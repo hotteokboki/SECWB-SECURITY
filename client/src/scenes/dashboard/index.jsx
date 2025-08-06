@@ -787,25 +787,14 @@ const Dashboard = ({}) => {
           const data = await res.json();
           const program = data[0]?.name;
 
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`,
-            {
-              credentials: "include", // Required to send session cookie
-            }
-          );
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`);
         } else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`,
-            {
-              credentials: "include", // Required to send session cookie
-            }
-          );
-        }
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`);
         }
 
-        const data = await response.json();
+        const data = await response.data;
         setStats(data);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -822,10 +811,10 @@ const Dashboard = ({}) => {
   useEffect(() => {
     const fetchSocialEnterprises = async () => {
       try {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesWithMentorship`
+        const response = await axiosClient.get(
+          `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesWithMentorship`
         );
-        const data = await response.json();
+        const data = response.data;
 
         // Format the data for the DataGrid
         const formattedData = data.map((se) => ({

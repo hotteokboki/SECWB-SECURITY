@@ -647,7 +647,7 @@ function formatTimeLabel(time24) {
   return `${hours}:${minutesStr} ${suffix}`;
 }
 
-app.get('/get-csrf-token', csrfProtection, (req, res) => {
+app.get('/get-csrf-token', isAuthenticated, csrfProtection, (req, res) => {
   const token = req.csrfToken();
   res.cookie('XSRF-TOKEN', token);
   res.json({ csrfToken: token });
@@ -1138,7 +1138,7 @@ app.post("/api/notify-mentor-application-status", async (req, res) => {
     res.status(500).json({ message: "Failed to send email notification." });
   }
 });
-
+// TO DO 
 app.post("/signup-lseed-coordinator", async (req, res) => {
   const { firstName, lastName, email, contactno, password, token } = req.body;
 
@@ -1486,6 +1486,7 @@ app.get("/api/mentors-with-mentorships", async (req, res) => {
   }
 });
 
+//TO DO
 app.get("/api/dashboard-stats", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
@@ -2161,8 +2162,8 @@ app.put("/api/admin/users/:id", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-// RONALDO PARTS BELOW
-app.get("/getAllSocialEnterprisesWithMentorship", async (req, res) => {
+
+app.get("/api/getAllSocialEnterprisesWithMentorship", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
@@ -2176,7 +2177,7 @@ app.get("/getAllSocialEnterprisesWithMentorship", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
+// RONALDO PARTS BELOW
 app.get("/comparePerformanceScore/:se1/:se2", async (req, res) => {
   try {
     const { se1, se2 } = req.params; // Expecting SE IDs
@@ -2368,7 +2369,7 @@ app.get("/getUpcomingSchedulesForMentor", async (req, res) => {
   }
 });
 
-app.get("/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
+app.get("/api/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
   try {
     const { se_id } = req.params; // Extract se_id from route parameters
 
@@ -2818,7 +2819,6 @@ app.get("/api/list-mentor-applications", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
 //CARLOS PARTS ABOVE
 
 // DIEGO PARTS BELOW

@@ -26,6 +26,7 @@ import { useAuth } from "../../context/authContext";
 import axios from "axios";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import axiosClient from "../../api/axiosClient";
 
 // 3. Destructure the new props from the function signature
 const Topbar = ({}) => {
@@ -71,7 +72,7 @@ const Topbar = ({}) => {
       console.log("🔍 Current user:", user); // Add this line
       console.log("🔍 User roles:", user.roles); // Add this line
 
-      const response = await axios.get(requestUrl);
+      const response = await axiosClient.get(requestUrl);
       console.log("📦 Raw notifications data:", response.data);
       console.log("📩 Notifications received:", response.data);
       console.log("📊 Number of notifications:", response.data.length); // Add this line

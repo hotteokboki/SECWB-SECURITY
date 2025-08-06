@@ -12,6 +12,7 @@ import LineChart from "./LineChart";
 import { useTheme } from "@mui/material";
 import { tokens } from "../theme";
 import { useAuth } from "../context/authContext";
+import axiosClient from "../api/axiosClient";
 
 const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
   const theme = useTheme();
@@ -51,7 +52,7 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
           });
         }
 
-        const data = await response.json();
+        const data = await response.data;
         const formattedData = Array.isArray(data) ? data : [];
 
         setTopPerformers(formattedData);

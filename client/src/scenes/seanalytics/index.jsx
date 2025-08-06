@@ -37,6 +37,7 @@ import ScatterPlot from "../../components/ScatterPlot";
 import PeopleIcon from "@mui/icons-material/People";
 import InventoryValuePie from "../../components/TotalInventoryPieChart.jsx";
 import InventoryTurnoverBar from "../../components/InventoryTurnoverBarChart.jsx";
+import axiosClient from "../../api/axiosClient.js";
 
 const SEAnalytics = () => {
   const theme = useTheme();
@@ -93,25 +94,19 @@ const SEAnalytics = () => {
     fetchApplicationDetails();
   }, [selectedSE]);
 
-  // Fetch all necessary data for the page
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch SE list
-        const seResponse = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprises`
-        );
-        const seData = await seResponse.json();
+        // 1. Fetch SE list
+        const seResponse = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprises`);
+        const seData = seResponse.data;
 
         const formattedSEData = seData.map((se) => ({
           id: se?.se_id ?? "",
           name: se?.team_name ?? "Unnamed SE",
           abbr: se?.abbr ?? "",
           description: se?.description ?? "",
-          sdgs:
-            Array.isArray(se?.sdgs) && se.sdgs.length > 0
-              ? se.sdgs
-              : ["No SDG listed"],
+          sdgs: Array.isArray(se?.sdgs) && se.sdgs.length > 0 ? se.sdgs : ["No SDG listed"],
           accepted_application_id: se?.accepted_application_id ?? "",
         }));
 
@@ -121,41 +116,41 @@ const SEAnalytics = () => {
           setSelectedSE(initialSE);
           setSelectedSEId(id);
         }
-        //DEBUG
-        // JM Check mo toh, kasi sa current Promise mo once nag error ung isang API error na kaagad yung whole code.
 
-        // ✅ Use Promise.all when the calls are all required together and you want to stop if any fails:
+        // 2. Financial Data
+        const [financialResult, cashFlowResult, inventoryResult] = await Promise.allSettled([
+          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`),
+          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
+          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`),
+        ]);
 
-        // "I can't render the financial section unless all parts load successfully."
+        if (financialResult.status === "fulfilled") {
+          setFinancialData(financialResult.value.data);
+        } else {
+          console.error("Failed to fetch financial data:", financialResult.reason);
+        }
 
-        // ✅ Use Promise.allSettled when partial data is OK:
+        if (cashFlowResult.status === "fulfilled") {
+          setCashFlowRaw(cashFlowResult.value.data);
+        } else {
+          console.error("Failed to fetch cash flow data:", cashFlowResult.reason);
+        }
 
-        // "If cash flow fails, show inventory and financial statements anyway."
+        if (inventoryResult.status === "fulfilled") {
+          setInventoryData(inventoryResult.value.data);
+        } else {
+          console.error("Failed to fetch inventory data:", inventoryResult.reason);
+        }
 
-        // Fetch financial-related data (still use Promise.all since all must succeed)
-        const [financialResponse, cashFlowResponse, inventoryResponse] =
-          await Promise.all([
-            axios.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`
-            ),
-            axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
-            axios.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`
-            ),
-          ]);
-        setFinancialData(financialResponse.data);
-        setCashFlowRaw(cashFlowResponse.data);
-        setInventoryData(inventoryResponse.data);
-
-        // Fetch SE-specific analytics (with fallbacks)
+        // 3. SE-specific analytics
         if (id) {
           const analyticsResults = await Promise.allSettled([
-            axiosClient.get(`/api/se-analytics-stats/${id}`),
-            axiosClient.get(`/api/critical-areas/${id}`),
-            axiosClient.get(`/api/common-challenges/${id}`),
-            axiosClient.get(`/api/likert-data/${id}`),
-            axiosClient.get(`/api/radar-data/${id}`),
-            axiosClient.get(`/getMentorEvaluationsBySEID/${id}`),
+            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/se-analytics-stats/${id}`),
+            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/critical-areas/${id}`),
+            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/common-challenges/${id}`),
+            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/likert-data/${id}`),
+            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/radar-data/${id}`),
+            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/getMentorEvaluationsBySEID/${id}`),
           ]);
 
           const [
@@ -167,25 +162,17 @@ const SEAnalytics = () => {
             evaluationsResult,
           ] = analyticsResults;
 
-          console.log("analyticsResults:", analyticsResults);
-
           // Evaluations
           if (evaluationsResult.status === "fulfilled") {
-            const rawEvaluations = await evaluationsResult.value.json();
-            console.log("Raw Evaluations", rawEvaluations);
-
-            const formattedEvaluationsData = rawEvaluations.map(
-              (evaluation) => ({
-                id: evaluation.evaluation_id,
-                evaluator_id: evaluation.evaluation_id,
-                evaluator_name: evaluation.evaluator_name,
-                social_enterprise: evaluation.social_enterprise,
-                evaluation_date: evaluation.evaluation_date,
-                acknowledged: evaluation.acknowledged ? "Yes" : "No",
-              })
-            );
-
-            console.log("Evaluation Data", formattedEvaluationsData);
+            const rawEvaluations = evaluationsResult.value.data;
+            const formattedEvaluationsData = rawEvaluations.map((evaluation) => ({
+              id: evaluation.evaluation_id,
+              evaluator_id: evaluation.evaluation_id,
+              evaluator_name: evaluation.evaluator_name,
+              social_enterprise: evaluation.social_enterprise,
+              evaluation_date: evaluation.evaluation_date,
+              acknowledged: evaluation.acknowledged ? "Yes" : "No",
+            }));
             setEvaluationsData(formattedEvaluationsData);
           } else {
             console.warn("No evaluations found or failed to fetch.");
@@ -193,17 +180,12 @@ const SEAnalytics = () => {
 
           // Stats
           if (statsResult.status === "fulfilled") {
-            const statsData = await statsResult.value.json();
+            const statsData = statsResult.value.data;
             setStats({
-              registeredUsers:
-                Number(statsData.registeredUsers?.[0]?.total_users) || 0,
-              totalEvaluations:
-                statsData.totalEvaluations?.[0]?.total_evaluations || "0",
-              pendingEvaluations:
-                statsData.pendingEvaluations?.[0]?.pending_evaluations || "0",
-              acknowledgedEvaluations:
-                statsData.acknowledgedEvaluations?.[0]
-                  ?.acknowledged_evaluations || "0",
+              registeredUsers: Number(statsData.registeredUsers?.[0]?.total_users) || 0,
+              totalEvaluations: statsData.totalEvaluations?.[0]?.total_evaluations || "0",
+              pendingEvaluations: statsData.pendingEvaluations?.[0]?.pending_evaluations || "0",
+              acknowledgedEvaluations: statsData.acknowledgedEvaluations?.[0]?.acknowledged_evaluations || "0",
               avgRating: statsData.avgRating?.[0]?.avg_rating || "N/A",
             });
           } else {
@@ -212,27 +194,20 @@ const SEAnalytics = () => {
 
           // Critical Areas
           if (criticalAreasResult.status === "fulfilled") {
-            const criticalAreasData = await criticalAreasResult.value.json();
-            setCriticalAreas(criticalAreasData);
+            setCriticalAreas(criticalAreasResult.value.data);
           }
 
-          // Pie Chart
+          // Pie Chart (common challenges)
           if (pieResult.status === "fulfilled") {
-            const rawPieData = await pieResult.value.json();
+            const rawPieData = pieResult.value.data;
             const formattedPieData = Array.from(
               new Map(
                 rawPieData.map((item, index) => [
                   item.category || `Unknown-${index}`,
                   {
                     id: item.category || `Unknown-${index}`,
-                    label:
-                      item.percentage && !isNaN(item.percentage)
-                        ? `${parseInt(item.percentage, 10)}%`
-                        : "0%",
-                    value:
-                      item.count && !isNaN(item.count)
-                        ? parseInt(item.count, 10)
-                        : 0,
+                    label: item.percentage && !isNaN(item.percentage) ? `${parseInt(item.percentage, 10)}%` : "0%",
+                    value: item.count && !isNaN(item.count) ? parseInt(item.count, 10) : 0,
                     comment: item.comment || "No comment available",
                   },
                 ])
@@ -243,13 +218,12 @@ const SEAnalytics = () => {
 
           // Likert
           if (likertResult.status === "fulfilled") {
-            const rawLikertData = await likertResult.value.json();
-            setLikertData(rawLikertData);
+            setLikertData(likertResult.value.data);
           }
 
           // Radar
           if (radarResult.status === "fulfilled") {
-            const radarChartData = await radarResult.value.json();
+            const radarChartData = radarResult.value.data;
             if (Array.isArray(radarChartData)) {
               setRadarData(radarChartData);
             } else {
@@ -258,7 +232,7 @@ const SEAnalytics = () => {
           }
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching data:", error?.response?.data || error.message);
       } finally {
         setIsLoadingEvaluations(false);
       }
@@ -313,24 +287,24 @@ const SEAnalytics = () => {
   // Calculate financial ratios for the selected SE
   const netProfitMargin = currentSEFinancialMetrics.totalRevenue
     ? (
-        (currentSEFinancialMetrics.netIncome /
-          currentSEFinancialMetrics.totalRevenue) *
-        100
-      ).toFixed(2)
+      (currentSEFinancialMetrics.netIncome /
+        currentSEFinancialMetrics.totalRevenue) *
+      100
+    ).toFixed(2)
     : "0.00";
   const grossProfitMargin = currentSEFinancialMetrics.totalRevenue
     ? (
-        ((currentSEFinancialMetrics.totalRevenue -
-          currentSEFinancialMetrics.totalExpenses) /
-          currentSEFinancialMetrics.totalRevenue) *
-        100
-      ).toFixed(2)
+      ((currentSEFinancialMetrics.totalRevenue -
+        currentSEFinancialMetrics.totalExpenses) /
+        currentSEFinancialMetrics.totalRevenue) *
+      100
+    ).toFixed(2)
     : "0.00";
   const debtToAssetRatio = currentSEFinancialMetrics.totalAssets
     ? (
-        currentSEFinancialMetrics.totalLiabilities /
-        currentSEFinancialMetrics.totalAssets
-      ).toFixed(2)
+      currentSEFinancialMetrics.totalLiabilities /
+      currentSEFinancialMetrics.totalAssets
+    ).toFixed(2)
     : "0.00";
 
   // Format revenue vs expenses for DualAxisLineChart (for selected SE)
@@ -969,9 +943,9 @@ const SEAnalytics = () => {
               isNaN(stats.acknowledgedEvaluations / stats.totalEvaluations)
                 ? "0%"
                 : `${(
-                    (stats.acknowledgedEvaluations / stats.totalEvaluations) *
-                    100
-                  ).toFixed(2)}%`
+                  (stats.acknowledgedEvaluations / stats.totalEvaluations) *
+                  100
+                ).toFixed(2)}%`
             }
             icon={
               <AssignmentIcon
@@ -1000,9 +974,9 @@ const SEAnalytics = () => {
             increase={
               stats.totalEvaluations > 0
                 ? `${(
-                    (stats.pendingEvaluations / stats.totalEvaluations) *
-                    100
-                  ).toFixed(2)}%`
+                  (stats.pendingEvaluations / stats.totalEvaluations) *
+                  100
+                ).toFixed(2)}%`
                 : "0%"
             }
             icon={
@@ -1240,7 +1214,7 @@ const SEAnalytics = () => {
 
               {/* Categories Section */}
               {selectedEvaluation.categories &&
-              selectedEvaluation.categories.length > 0 ? (
+                selectedEvaluation.categories.length > 0 ? (
                 selectedEvaluation.categories.map((category, index) => (
                   <Box
                     key={index}

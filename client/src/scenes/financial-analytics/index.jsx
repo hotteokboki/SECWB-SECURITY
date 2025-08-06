@@ -16,6 +16,7 @@ import MoneyOffOutlinedIcon from "@mui/icons-material/MoneyOffOutlined";
 import InventoryValuePie from "../../components/TotalInventoryPieChart.jsx";
 import InventoryTurnoverBar from "../../components/InventoryTurnoverBarChart.jsx";
 import { useAuth } from "../../context/authContext";
+import axiosClient from "../../api/axiosClient.js";
 
 const FinancialAnalytics = ({}) => {
   const theme = useTheme();
@@ -30,8 +31,8 @@ const FinancialAnalytics = ({}) => {
     const fetchData = async () => {
       try {
         const [financialResponse, cashFlowResponse] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`),
-          axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
+          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`),
+          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
         ]);
         setFinancialData(financialResponse.data);
         setCashFlowRaw(cashFlowResponse.data);

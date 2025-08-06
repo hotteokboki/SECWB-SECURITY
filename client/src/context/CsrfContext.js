@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 
 const CsrfContext = createContext(null);
 
@@ -19,7 +20,7 @@ export const CsrfProvider = ({ children }) => {
   useEffect(() => {
     const fetchCsrfToken = async () => {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/get-csrf-token`, {
+        const res = await axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/get-csrf-token`, {
           withCredentials: true
         });
         setCsrfToken(res.data.csrfToken);

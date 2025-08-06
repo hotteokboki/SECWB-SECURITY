@@ -23,10 +23,9 @@ import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
 import { useAuth } from "../../context/authContext";
-import axios from "axios";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import axiosClient from "../../api/axiosClient";
+import axiosClient from "../../api/axiosClient"
 
 // 3. Destructure the new props from the function signature
 const Topbar = ({}) => {
@@ -66,27 +65,16 @@ const Topbar = ({}) => {
       }
 
       const requestUrl = `${API_BASE_URL}/api/notifications?receiver_id=${user.id}`;
-      console.log("👤 Frontend user ID:", user?.id);
-
-      console.log("🔍 Making request to:", requestUrl);
-      console.log("🔍 Current user:", user); // Add this line
-      console.log("🔍 User roles:", user.roles); // Add this line
 
       const response = await axiosClient.get(requestUrl);
-      console.log("📦 Raw notifications data:", response.data);
-      console.log("📩 Notifications received:", response.data);
-      console.log("📊 Number of notifications:", response.data.length); // Add this line
       setNotifications([...response.data]);
-      console.log("🔔 Updated notifications state:", notifications);
     } catch (error) {
       console.error("❌ Error fetching notifications:", error);
     }
   };
 
   useEffect(() => {
-    console.log("👤 User detected:", user); // ✅ Log user info
     if (user && user.id) {
-      console.log("🔄 Fetching notifications for:", user.id);
       fetchNotifications();
       const interval = setInterval(fetchNotifications, 5000);
       return () => clearInterval(interval);
@@ -94,10 +82,7 @@ const Topbar = ({}) => {
   }, [user]);
 
   const markNotificationAsRead = async (notificationId) => {
-    await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/notifications/${notificationId}/read`, {
-      method: "PUT",
-      credentials: "include",
-    });
+    await axiosClient.put(`${process.env.REACT_APP_API_BASE_URL}/api/notifications/${notificationId}/read`);
 
     // Update local state
     setNotifications((prev) =>
@@ -106,10 +91,6 @@ const Topbar = ({}) => {
       )
     );
   };
-
-  useEffect(() => {
-    console.log("🔥 Notifications state updated:", notifications);
-  }, [notifications]); // ✅ Ensure React tracks updates
 
   const hasBothRoles =
     user?.roles?.includes("LSEED-Coordinator") &&
@@ -199,9 +180,6 @@ const Topbar = ({}) => {
           >
             Notifications
           </Typography>
-
-          {/* Debug JSX */}
-          {console.log("🛠 Rendering Notifications:", notifications)}
 
           {/* Notification Items Container */}
           <Box

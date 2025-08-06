@@ -39,7 +39,7 @@ const AdminPage = () => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await axiosClient(`/api/admin/users`);
+        const response = await axiosClient.get(`/api/admin/users`);
         
         setUsers(response.data);
       } catch (err) {

@@ -652,7 +652,7 @@ app.get('/get-csrf-token', csrfProtection, (req, res) => {
   res.cookie('XSRF-TOKEN', token);
   res.json({ csrfToken: token });
 });
-// SUBA
+// SUBA PARTS BELOW
 app.post("/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
@@ -2050,7 +2050,9 @@ app.get('/api/check-mentor-application-status', async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
-// SUBA
+// SUBA PARTS ABOVE
+
+// DIEGO PARTS BELOW
 app.get("/api/get-programs", async (req, res) => {
   try {
     const programCoordinators = await getProgramCoordinators(); // Fetch users from DB
@@ -2159,7 +2161,7 @@ app.put("/api/admin/users/:id", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
+// RONALDO PARTS BELOW
 app.get("/getAllSocialEnterprisesWithMentorship", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
@@ -2366,7 +2368,6 @@ app.get("/getUpcomingSchedulesForMentor", async (req, res) => {
   }
 });
 
-
 app.get("/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
   try {
     const { se_id } = req.params; // Extract se_id from route parameters
@@ -2387,7 +2388,9 @@ app.get("/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
   }
 });
 
-// CARLOS
+// RONALDO PARTS ABOVE
+
+// CARLOS PARTS BELOW
 
 app.get("/api/mentor-evaluations-by-mentor-id", async (req, res) => {
   try {
@@ -2816,9 +2819,9 @@ app.get("/api/list-mentor-applications", async (req, res) => {
   }
 });
 
+//CARLOS PARTS ABOVE
 
-//CARLOS
-
+// DIEGO PARTS BELOW
 // PUT route to update application status
 app.put("/api/application/:id/status", async (req, res) => {
   const { id } = req.params;
@@ -3109,18 +3112,7 @@ app.get("/heatmap-stats", async (req, res) => {
   }
 });
 
-//For Testing only
-app.get("/api-test", async (req, res) => {
-  try {
-    const result = await getImprovementScorePerMonthAnnually()
-
-    res.json(result);
-  } catch (error) {
-    console.error("Error in testing:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
+// DO NOT MODIFY ANYTHING IN THIS API
 app.post("/webhook-bot1", async (req, res) => {
   const message = req.body.message || req.body.edited_message;
   const callbackQuery = req.body.callback_query;
@@ -4403,7 +4395,7 @@ app.post("/webhook-bot1", async (req, res) => {
     });
   }
 });
-
+// DO NOT MODIFY ANYTHING IN THIS API
 app.post("/api/googleform-webhook", async (req, res) => {
   const formData = req.body;
 
@@ -4731,7 +4723,9 @@ app.post("/declineMentorship", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+// DIEGO PARTS ABOVE
 
+// RONALDO PARTS BELOW
 app.post("/updateMentorshipDate", async (req, res) => {
   console.log("🔹 Received request at /updateMentorshipDate");
 
@@ -5094,32 +5088,6 @@ ORDER BY n.created_at DESC;
   }
 });
 
-// NEED PA BA ITO?
-// app.put('/updateUserRole/:id', requireAuth, async (req, res) => {
-//   const { id } = req.params;
-//   const { role } = req.body; // 'admin' or 'user'
-//   const updatedUser = req.body;
-
-//   // console.log("Received update request for user ID:", id);
-
-//   try {
-//     // Update the user's role in the database
-//     const query = 'UPDATE users SET role = $1 WHERE id = $2 RETURNING *';
-//     const values = [role, id];
-//     const result = await pgDatabase.query(query, values);
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     res.json(result.rows[0]); // Respond with updated user data
-//   } catch (error) {
-//     console.error("Error updating user role:", error);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// });
-
-
 // For Analytics Page
 
 app.get("/api/financial-statements", async (req, res) => {
@@ -5138,50 +5106,9 @@ app.get("/api/financial-statements", async (req, res) => {
   }
 });
 
-// DELETE?
-// // ==========================
-// // 📌 API: Check Pending Meetings (Telegram Notification)
-// // ==========================
-// app.get("/checkPendingMeetings", async (req, res) => {
-//   try {
-//     console.log("🔍 Running checkPendingMeetings API...");
+// RONALDO PARTS ABOVE
 
-//     const query = `
-//       SELECT m.mentorship_id, m.se_id, m.mentorship_date, t.chatid
-//       FROM mentorships m
-//       JOIN telegrambot t ON m.se_id = t.se_id
-//       WHERE m.telegramstatus = 'Pending'
-//     `;
-
-//     const result = await pgDatabase.query(query);
-//     console.log("📄 Query Result:", result.rows);
-
-//     if (result.rows.length === 0) {
-//       console.log("❌ No pending mentorships found.");
-//       return res.json({ message: "No pending mentorship requests." });
-//     }
-
-//     for (const row of result.rows) {
-//       const { mentorship_id, se_id, mentorship_date, chatid } = row;
-
-//       if (!chatid) {
-//         console.warn(`⚠️ No Telegram chat ID found for SE ID ${se_id}`);
-//         continue;
-//       }
-
-//       console.log(`📩 Sending message to Chat ID: ${chatid} for mentorship ${mentorship_id}`);
-//       sendMentorshipMessage(chatid, mentorship_id, mentorship_date);
-//     }
-
-//     res.json({ success: true, message: "Mentorship messages sent." });
-
-//   } catch (error) {
-//     console.error("❌ ERROR in /checkPendingMeetings:", error.stack);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// });
-
-// ✅ THEN serve React static files
+// Serve Static Files
 app.use(express.static(path.join(__dirname, 'client/build')));
 
 // ✅ Finally, handle client-side routing fallback

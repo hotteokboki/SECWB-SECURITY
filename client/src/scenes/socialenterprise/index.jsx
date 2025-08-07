@@ -143,28 +143,28 @@ const SocialEnterprise = ({}) => {
       const focalEmail = row.focal_email;
       const team_name = row.team_name;
 
-    try {
-      const response = await axiosClient.put(
-        `${process.env.REACT_APP_API_BASE_URL}/api/application/${applicationId}/status`,
-        {
-          status: "Declined",
-          email: focalEmail,
-          team_name: team_name,
-        }
-      );
+      try {
+        const response = await axiosClient.put(
+          `${process.env.REACT_APP_API_BASE_URL}/api/application/${applicationId}/status`,
+          {
+            status: "Declined",
+            email: focalEmail,
+            team_name: team_name,
+          }
+        );
 
-      console.log("✅ Status updated to Declined.");
-      setSnackbar({
-        open: true,
-        message: "Declined Social Enterprise Application",
-        severity: "success",
-      });
+        console.log("✅ Status updated to Declined.");
+        setSnackbar({
+          open: true,
+          message: "Declined Social Enterprise Application",
+          severity: "success",
+        });
 
-      await new Promise((r) => setTimeout(r, 1500));
-      window.location.reload();
-    } catch (error) {
-      console.error("❌ Failed to decline the application:", error);
-    }
+        await new Promise((r) => setTimeout(r, 1500));
+        window.location.reload();
+      } catch (error) {
+        console.error("❌ Failed to decline the application:", error);
+      }
 
       handleCloseMenu(); // Close the dropdown
     }
@@ -258,8 +258,10 @@ const SocialEnterprise = ({}) => {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        const response = await axiosClient.get(`/api/list-se-applications`); // adjust endpoint as needed
-        const data = await response.json();
+        const response = await axiosClient.get(
+          `${process.env.REACT_APP_API_BASE_URL}/api/list-se-applications`
+        ); // adjust endpoint as needed
+        const data = response.data;
 
         // Format date_applied in all items
         const formatted = data.map((item) => ({
@@ -287,9 +289,10 @@ const SocialEnterprise = ({}) => {
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const response = await axiosClient.get(`/api/all-programs`);
-        const data = await response.json();
-        setPrograms(data); // Update the state with the fetched programs
+        const response = await axiosClient.get(
+          `${process.env.REACT_APP_API_BASE_URL}/api/get-All-Programs`
+        ); // Call the API endpoint
+        setPrograms(response.data); // Update the state with the fetched programs
       } catch (error) {
         console.error("Error fetching programs:", error);
       }

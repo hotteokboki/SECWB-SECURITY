@@ -33,25 +33,32 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
         let response;
 
         if (isCoordinator) {
-          const res = await axiosClient.get(
+          const res = await fetch(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              method: "GET",
+              credentials: "include", // Required to send session cookie
+            }
+          );
+
+          const data = await res.json();
+          const program = data[0]?.name;
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/top-se-performance?period=${period}&program=${program}`,
             {
               withCredentials: true,
             }
           );
-
-          const data = res.data;
-          const program = data[0]?.name;
-          response = await axiosClient.get(`/api/top-se-performance`, {
-            params: { period, program },
-          });
         } else {
-          response = await axiosClient.get(`/api/top-se-performance`, {
-            params: { period, se_id: selectedSEId },
-          });
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/top-se-performance?period=${period}&se_id=${selectedSEId}`,
+            {
+              withCredentials: true,
+            }
+          );
         }
 
-        const data = await response.data;
+        const data = response.data;
         const formattedData = Array.isArray(data) ? data : [];
 
         setTopPerformers(formattedData);
@@ -77,8 +84,6 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
             },
             null
           );
-
-          console.log("Top performer for", period, ":", topSE?.name); // Debugging log
           setTopPerformer(topSE ? topSE.name : null);
         } else {
           setTopPerformer(null);

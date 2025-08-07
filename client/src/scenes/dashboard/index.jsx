@@ -660,8 +660,10 @@ const Dashboard = ({}) => {
 
     try {
       const response = await axiosClient.get(
-        `/api/evaluation-details-for-mentor-evaluation`,
-        { params: { evaluation_id } }
+        `${process.env.REACT_APP_API_BASE_URL}/api/get-Evaluation-Details`,
+        {
+          params: { evaluation_id },
+        }
       );
 
       console.log("📥 Raw API Response:", response); // Log raw response
@@ -778,10 +780,12 @@ const Dashboard = ({}) => {
           const program = data[0]?.name;
 
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`);
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`
+          );
         } else {
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`);
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`
+          );
         }
 
         const data = await response.data;

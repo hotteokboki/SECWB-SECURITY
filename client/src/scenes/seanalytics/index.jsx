@@ -98,7 +98,9 @@ const SEAnalytics = () => {
     const fetchData = async () => {
       try {
         // 1. Fetch SE list
-        const seResponse = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprises`);
+        const seResponse = await axios.get(
+          `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprises`
+        );
         const seData = seResponse.data;
 
         const formattedSEData = seData.map((se) => ({
@@ -106,7 +108,10 @@ const SEAnalytics = () => {
           name: se?.team_name ?? "Unnamed SE",
           abbr: se?.abbr ?? "",
           description: se?.description ?? "",
-          sdgs: Array.isArray(se?.sdgs) && se.sdgs.length > 0 ? se.sdgs : ["No SDG listed"],
+          sdgs:
+            Array.isArray(se?.sdgs) && se.sdgs.length > 0
+              ? se.sdgs
+              : ["No SDG listed"],
           accepted_application_id: se?.accepted_application_id ?? "",
         }));
 
@@ -118,39 +123,67 @@ const SEAnalytics = () => {
         }
 
         // 2. Financial Data
-        const [financialResult, cashFlowResult, inventoryResult] = await Promise.allSettled([
-          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`),
-          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
-          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`),
-        ]);
+        const [financialResult, cashFlowResult, inventoryResult] =
+          await Promise.allSettled([
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/cashflow`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`
+            ),
+          ]);
 
         if (financialResult.status === "fulfilled") {
           setFinancialData(financialResult.value.data);
         } else {
-          console.error("Failed to fetch financial data:", financialResult.reason);
+          console.error(
+            "Failed to fetch financial data:",
+            financialResult.reason
+          );
         }
 
         if (cashFlowResult.status === "fulfilled") {
           setCashFlowRaw(cashFlowResult.value.data);
         } else {
-          console.error("Failed to fetch cash flow data:", cashFlowResult.reason);
+          console.error(
+            "Failed to fetch cash flow data:",
+            cashFlowResult.reason
+          );
         }
 
         if (inventoryResult.status === "fulfilled") {
           setInventoryData(inventoryResult.value.data);
         } else {
-          console.error("Failed to fetch inventory data:", inventoryResult.reason);
+          console.error(
+            "Failed to fetch inventory data:",
+            inventoryResult.reason
+          );
         }
 
         // 3. SE-specific analytics
         if (id) {
           const analyticsResults = await Promise.allSettled([
-            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/se-analytics-stats/${id}`),
-            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/critical-areas/${id}`),
-            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/common-challenges/${id}`),
-            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/likert-data/${id}`),
-            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/radar-data/${id}`),
-            axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/getMentorEvaluationsBySEID/${id}`),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/se-analytics-stats/${id}`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/critical-areas/${id}`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/common-challenges/${id}`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/likert-data/${id}`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/radar-data/${id}`
+            ),
+            axiosClient.get(
+              `${process.env.REACT_APP_API_BASE_URL}/api/getMentorEvaluationsBySEID/${id}`
+            ),
           ]);
 
           const [
@@ -165,14 +198,16 @@ const SEAnalytics = () => {
           // Evaluations
           if (evaluationsResult.status === "fulfilled") {
             const rawEvaluations = evaluationsResult.value.data;
-            const formattedEvaluationsData = rawEvaluations.map((evaluation) => ({
-              id: evaluation.evaluation_id,
-              evaluator_id: evaluation.evaluation_id,
-              evaluator_name: evaluation.evaluator_name,
-              social_enterprise: evaluation.social_enterprise,
-              evaluation_date: evaluation.evaluation_date,
-              acknowledged: evaluation.acknowledged ? "Yes" : "No",
-            }));
+            const formattedEvaluationsData = rawEvaluations.map(
+              (evaluation) => ({
+                id: evaluation.evaluation_id,
+                evaluator_id: evaluation.evaluation_id,
+                evaluator_name: evaluation.evaluator_name,
+                social_enterprise: evaluation.social_enterprise,
+                evaluation_date: evaluation.evaluation_date,
+                acknowledged: evaluation.acknowledged ? "Yes" : "No",
+              })
+            );
             setEvaluationsData(formattedEvaluationsData);
           } else {
             console.warn("No evaluations found or failed to fetch.");
@@ -182,10 +217,15 @@ const SEAnalytics = () => {
           if (statsResult.status === "fulfilled") {
             const statsData = statsResult.value.data;
             setStats({
-              registeredUsers: Number(statsData.registeredUsers?.[0]?.total_users) || 0,
-              totalEvaluations: statsData.totalEvaluations?.[0]?.total_evaluations || "0",
-              pendingEvaluations: statsData.pendingEvaluations?.[0]?.pending_evaluations || "0",
-              acknowledgedEvaluations: statsData.acknowledgedEvaluations?.[0]?.acknowledged_evaluations || "0",
+              registeredUsers:
+                Number(statsData.registeredUsers?.[0]?.total_users) || 0,
+              totalEvaluations:
+                statsData.totalEvaluations?.[0]?.total_evaluations || "0",
+              pendingEvaluations:
+                statsData.pendingEvaluations?.[0]?.pending_evaluations || "0",
+              acknowledgedEvaluations:
+                statsData.acknowledgedEvaluations?.[0]
+                  ?.acknowledged_evaluations || "0",
               avgRating: statsData.avgRating?.[0]?.avg_rating || "N/A",
             });
           } else {
@@ -206,8 +246,14 @@ const SEAnalytics = () => {
                   item.category || `Unknown-${index}`,
                   {
                     id: item.category || `Unknown-${index}`,
-                    label: item.percentage && !isNaN(item.percentage) ? `${parseInt(item.percentage, 10)}%` : "0%",
-                    value: item.count && !isNaN(item.count) ? parseInt(item.count, 10) : 0,
+                    label:
+                      item.percentage && !isNaN(item.percentage)
+                        ? `${parseInt(item.percentage, 10)}%`
+                        : "0%",
+                    value:
+                      item.count && !isNaN(item.count)
+                        ? parseInt(item.count, 10)
+                        : 0,
                     comment: item.comment || "No comment available",
                   },
                 ])
@@ -232,7 +278,10 @@ const SEAnalytics = () => {
           }
         }
       } catch (error) {
-        console.error("Error fetching data:", error?.response?.data || error.message);
+        console.error(
+          "Error fetching data:",
+          error?.response?.data || error.message
+        );
       } finally {
         setIsLoadingEvaluations(false);
       }
@@ -287,24 +336,24 @@ const SEAnalytics = () => {
   // Calculate financial ratios for the selected SE
   const netProfitMargin = currentSEFinancialMetrics.totalRevenue
     ? (
-      (currentSEFinancialMetrics.netIncome /
-        currentSEFinancialMetrics.totalRevenue) *
-      100
-    ).toFixed(2)
+        (currentSEFinancialMetrics.netIncome /
+          currentSEFinancialMetrics.totalRevenue) *
+        100
+      ).toFixed(2)
     : "0.00";
   const grossProfitMargin = currentSEFinancialMetrics.totalRevenue
     ? (
-      ((currentSEFinancialMetrics.totalRevenue -
-        currentSEFinancialMetrics.totalExpenses) /
-        currentSEFinancialMetrics.totalRevenue) *
-      100
-    ).toFixed(2)
+        ((currentSEFinancialMetrics.totalRevenue -
+          currentSEFinancialMetrics.totalExpenses) /
+          currentSEFinancialMetrics.totalRevenue) *
+        100
+      ).toFixed(2)
     : "0.00";
   const debtToAssetRatio = currentSEFinancialMetrics.totalAssets
     ? (
-      currentSEFinancialMetrics.totalLiabilities /
-      currentSEFinancialMetrics.totalAssets
-    ).toFixed(2)
+        currentSEFinancialMetrics.totalLiabilities /
+        currentSEFinancialMetrics.totalAssets
+      ).toFixed(2)
     : "0.00";
 
   // Format revenue vs expenses for DualAxisLineChart (for selected SE)
@@ -472,12 +521,13 @@ const SEAnalytics = () => {
   ];
 
   const handleViewExistingEvaluation = async (evaluation_id) => {
-    console.log("📌 Evaluation ID Passed:", evaluation_id);
-
     try {
-      const response = await axiosClient.get(`/api/evaluation-details`, {
-        params: { evaluation_id },
-      });
+      const response = await axiosClient.get(
+        `${process.env.REACT_APP_API_BASE_URL}/api/get-Evaluation-Details`,
+        {
+          params: { evaluation_id },
+        }
+      );
 
       if (!response.data || response.data.length === 0) {
         console.warn("⚠️ No evaluation details found.");
@@ -515,7 +565,6 @@ const SEAnalytics = () => {
         return acc;
       }, {});
 
-      console.log("✅ Processed Evaluation Data:", groupedEvaluation);
       setSelectedEvaluation(groupedEvaluation);
       setOpenDialog(true);
     } catch (error) {
@@ -943,9 +992,9 @@ const SEAnalytics = () => {
               isNaN(stats.acknowledgedEvaluations / stats.totalEvaluations)
                 ? "0%"
                 : `${(
-                  (stats.acknowledgedEvaluations / stats.totalEvaluations) *
-                  100
-                ).toFixed(2)}%`
+                    (stats.acknowledgedEvaluations / stats.totalEvaluations) *
+                    100
+                  ).toFixed(2)}%`
             }
             icon={
               <AssignmentIcon
@@ -974,9 +1023,9 @@ const SEAnalytics = () => {
             increase={
               stats.totalEvaluations > 0
                 ? `${(
-                  (stats.pendingEvaluations / stats.totalEvaluations) *
-                  100
-                ).toFixed(2)}%`
+                    (stats.pendingEvaluations / stats.totalEvaluations) *
+                    100
+                  ).toFixed(2)}%`
                 : "0%"
             }
             icon={
@@ -1214,7 +1263,7 @@ const SEAnalytics = () => {
 
               {/* Categories Section */}
               {selectedEvaluation.categories &&
-                selectedEvaluation.categories.length > 0 ? (
+              selectedEvaluation.categories.length > 0 ? (
                 selectedEvaluation.categories.map((category, index) => (
                   <Box
                     key={index}

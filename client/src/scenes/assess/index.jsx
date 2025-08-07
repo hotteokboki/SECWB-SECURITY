@@ -122,7 +122,9 @@ const EvaluatePage = ({}) => {
   useEffect(() => {
     const fetchPredefinedComments = async () => {
       try {
-        const response = await axiosClient.get(`/api/predefined-comments`);
+        const response = await axiosClient.get(
+          `${process.env.REACT_APP_API_BASE_URL}/api/get-PreDefined-Comments`
+        );
         setEvaluationCriteria(response.data); // Store fetched data in state
         console.log("📥 Predefined Comments Fetched:", response.data);
       } catch (error) {
@@ -312,7 +314,7 @@ const EvaluatePage = ({}) => {
         setIsLoadingEvaluations(true);
 
         const response = await axiosClient.get(
-          `/api/all-mentor-evaluation-types`
+          `${process.env.REACT_APP_API_BASE_URL}/api/get-All-Mentor-Evaluation-Type`
         );
 
         const data = response.data; // ✅ Axios already returns JSON, no need for .json()
@@ -377,7 +379,7 @@ const EvaluatePage = ({}) => {
 
     try {
       const response = await axiosClient.get(
-        `/api/evaluation-details-for-mentor-evaluation`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/get-Evaluation-Details-For-Mentor-Evaluation`,
         { params: { evaluation_id } }
       );
 
@@ -439,8 +441,10 @@ const EvaluatePage = ({}) => {
 
     try {
       const response = await axiosClient.get(
-        `/api/evaluation-details-for-mentor-evaluation`,
-        { params: { evaluation_id } }
+        `${process.env.REACT_APP_API_BASE_URL}/api/get-Evaluation-Details`,
+        {
+          params: { evaluation_id },
+        }
       );
 
       console.log("📥 Raw API Response:", response); // Log raw response
@@ -567,7 +571,7 @@ const EvaluatePage = ({}) => {
           setIsLoadingSocialEnterprises(true); // Start loading
 
           const mentorshipsResponse = await axiosClient.get(
-            `/api/available-evaluations`,
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-Available-Evaluations`,
             {
               withCredentials: true, // Equivalent to credentials: "include"
             }

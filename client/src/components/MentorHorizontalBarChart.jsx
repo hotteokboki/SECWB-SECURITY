@@ -15,9 +15,9 @@ const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
 
       try {
         const response = await axiosClient.get(
-          `/api/mentor-analytics/${mentorId}`
+          `${process.env.REACT_APP_API_BASE_URL}/api/mentor-analytics/${mentorId}`
         );
-        const data = await response.json();
+        const data = response.data;
 
         if (
           !data.avgRatingPerCategory ||

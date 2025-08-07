@@ -407,10 +407,12 @@ const Scheduling = ({}) => {
     try {
       setIsLoading(true);
 
-      const response = await axiosClient.get(`/api/mentorships-by-id`, {
-        params: { mentor_id: user.id },
-      });
-      const data = await response.json();
+      const response = await axiosClient.get(
+        `${
+          process.env.REACT_APP_API_BASE_URL
+        }/api/get-Mentorships-by-ID?mentor_id=${encodeURIComponent(user.id)}`
+      );
+      const data = response.data;
 
       console.log("📥 Received Data in Scheduling:", data);
 
@@ -424,9 +426,12 @@ const Scheduling = ({}) => {
 
       for (const se of data) {
         try {
-          const checkResponse = await axiosClient.get(
-            `/api/check-telegram-registration`,
-            { params: { mentor_id: se.mentor_id, se_id: se.se_id } }
+          const checkResponse = await fetch(
+            `${
+              process.env.REACT_APP_API_BASE_URL
+            }/checkTelegramRegistration?mentor_id=${encodeURIComponent(
+              se.mentor_id
+            )}&se_id=${encodeURIComponent(se.se_id)}`
           );
           const checkData = await checkResponse.json();
 

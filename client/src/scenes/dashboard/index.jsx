@@ -324,18 +324,14 @@ const Dashboard = ({}) => {
     try {
       const { id, mentorship_id, realDate, realTime, zoom } = schedule;
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/approveMentorship`,
+      const response = await axiosClient.post(
+        `${process.env.REACT_APP_API_BASE_URL}/api/approveMentorship`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mentoring_session_id: id,
-            mentorship_id,
-            mentorship_date: realDate,
-            mentorship_time: realTime,
-            zoom_link: zoom,
-          }),
+          mentoring_session_id: id,
+          mentorship_id,
+          mentorship_date: realDate,
+          mentorship_time: realTime,
+          zoom_link: zoom,
         }
       );
 
@@ -357,12 +353,10 @@ const Dashboard = ({}) => {
     try {
       const { id } = schedule; // Extract ID
 
-      const response = await fetch(
+      const response = await axiosClient.post(
         `${process.env.REACT_APP_API_BASE_URL}/declineMentorship`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mentoring_session_id: id }),
+          mentoring_session_id: id,
         }
       );
 
@@ -565,14 +559,13 @@ const Dashboard = ({}) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
-              method: "GET",
-              credentials: "include", // Required to send session cookie
+              withCredentials: true,
             }
           );
-          const data = await res.json();
+          const data = res.data;
           const program = data[0]?.name;
 
           response = await axiosClient(`/api/flagged-ses?program=${program}`);
@@ -608,15 +601,14 @@ const Dashboard = ({}) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
-              method: "GET",
-              credentials: "include", // Required to send session cookie
+              withCredentials: true,
             }
           );
 
-          const data = await res.json();
+          const data = res.data;
           const program = data[0]?.name;
 
           response = await axiosClient(
@@ -726,15 +718,14 @@ const Dashboard = ({}) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
-              method: "GET",
-              credentials: "include", // Required to send session cookie
+              withCredentials: true,
             }
           );
 
-          const dataJSON = await res.json();
+          const dataJSON = res.data;
           const program = dataJSON[0]?.name;
 
           response = await axiosClient(
@@ -777,14 +768,13 @@ const Dashboard = ({}) => {
 
         let response;
         if (isCoordinator) {
-          const res = await fetch(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
-              method: "GET",
-              credentials: "include", // Required to send session cookie
+              withCredentials: true,
             }
           );
-          const data = await res.json();
+          const data = res.data;
           const program = data[0]?.name;
 
           response = await axiosClient.get(
@@ -1599,7 +1589,7 @@ const Dashboard = ({}) => {
               <Button
                 variant="contained"
                 startIcon={<SupervisorAccountOutlinedIcon />}
-                onClick={() => navigate("/mentorships")}
+                onClick={() => navigate("/api/mentorships")}
                 sx={{
                   flexGrow: 1,
                   backgroundColor: colors.blueAccent[800],

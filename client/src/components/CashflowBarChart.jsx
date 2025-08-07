@@ -88,7 +88,7 @@ const CashFlowBarChart = ({}) => {
 
       try {
         if (isLSEEDCoordinator) {
-          const res = await axios.get(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
               withCredentials: true, // Equivalent to credentials: "include"

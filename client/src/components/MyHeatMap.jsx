@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Box, Select, MenuItem, Typography, Tooltip, IconButton } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { useAuth } from "../context/authContext";
+import axiosClient from "../api/axiosClient";
 
 const HeatmapWrapper = ( {} ) => {
   const theme = useTheme();
@@ -19,24 +20,35 @@ const HeatmapWrapper = ( {} ) => {
       try {
         let response;
 
+        let program = null;
+
         if (isLSEEDCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
-
-          const data = await res.json();
-          const program = data[0]?.name; 
-
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/heatmap-stats?period=${period}&program=${program}`
+          const res = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              withCredentials: true,
+            }
           );
-        } else {
-          response = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/heatmap-stats?period=${period}`
-          );
+
+          const data = res.data;
+          program = data[0]?.name;
+
+          if (!program) {
+            throw new Error("No program found for this coordinator");
+          }
         }
-        const data = await response.json();
+
+        const statsRes = await axiosClient.get(
+          `${process.env.REACT_APP_API_BASE_URL}/heatmap-stats`,
+          {
+            params: {
+              period,
+              ...(program ? { program } : {}),
+            },
+          }
+        );
+
+        const data = statsRes.data;
 
         console.log("Fetched Data:", data);
 
@@ -54,7 +66,7 @@ const HeatmapWrapper = ( {} ) => {
     };
 
     fetchHeatMapStats();
-  }, [period]); // 🔄 Re-fetch data when `period` changes
+  }, [period]); // Re-run when `period` changes
 
   const transformedData = heatMapStats.map(
     ({ abbr, team_name, ...scores }) => ({

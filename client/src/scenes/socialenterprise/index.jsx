@@ -143,40 +143,28 @@ const SocialEnterprise = ({}) => {
       const focalEmail = row.focal_email;
       const team_name = row.team_name;
 
-      try {
-        const response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL}/api/application/${applicationId}/status`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              status: "Declined",
-              email: focalEmail,
-              team_name: team_name,
-            }),
-          }
-        );
-
-        if (response.ok) {
-          console.log("✅ Status updated to Declined.");
-          setSnackbar({
-            open: true,
-            message: "Decline Social Enterprise Application",
-            severity: "success",
-          });
-
-          await new Promise((r) => setTimeout(r, 1500));
-          window.location.reload();
-        } else {
-          console.error(
-            "❌ Failed to decline the application. Response not ok."
-          );
+    try {
+      const response = await axiosClient.put(
+        `${process.env.REACT_APP_API_BASE_URL}/api/application/${applicationId}/status`,
+        {
+          status: "Declined",
+          email: focalEmail,
+          team_name: team_name,
         }
-      } catch (error) {
-        console.error("❌ Network or server error:", error);
-      }
+      );
+
+      console.log("✅ Status updated to Declined.");
+      setSnackbar({
+        open: true,
+        message: "Declined Social Enterprise Application",
+        severity: "success",
+      });
+
+      await new Promise((r) => setTimeout(r, 1500));
+      window.location.reload();
+    } catch (error) {
+      console.error("❌ Failed to decline the application:", error);
+    }
 
       handleCloseMenu(); // Close the dropdown
     }
@@ -202,7 +190,7 @@ const SocialEnterprise = ({}) => {
         let response;
 
         if (user?.roles?.includes("LSEED-Coordinator")) {
-          const res = await axios.get(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
               withCredentials: true, // Equivalent to credentials: "include"
@@ -334,7 +322,7 @@ const SocialEnterprise = ({}) => {
 
   const handleSERowUpdate = async (updatedRow) => {
     try {
-      const response = await axios.put(
+      const response = await axiosClient.put(
         `${process.env.REACT_APP_API_BASE_URL}/updateSocialEnterprise/${updatedRow.id}`,
         updatedRow
       );
@@ -397,17 +385,19 @@ const SocialEnterprise = ({}) => {
         accepted_application_id: socialEnterpriseData.applicationId,
       };
 
-      const response = await fetch(
+      const response = await axiosClient.post(
         `${process.env.REACT_APP_API_BASE_URL}/api/social-enterprises`,
+        newSocialEnterprise,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newSocialEnterprise),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: true, // if needed
         }
       );
 
       if (response.ok) {
-        const data = await response.json();
+        const data = response.data;
         console.log(
           "Social Enterprise added successfully with SE ID:",
           data.se_id
@@ -415,12 +405,16 @@ const SocialEnterprise = ({}) => {
 
         // 🔄 Update the application status to "Accepted"
         if (socialEnterpriseData.applicationId) {
-          await fetch(
+          await axiosClient.put(
             `${process.env.REACT_APP_API_BASE_URL}/api/application/${socialEnterpriseData.applicationId}/status`,
             {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "Accepted" }),
+              status: "Accepted", // ✅ This is the body payload
+            },
+            {
+              headers: {
+                "Content-Type": "application/json", // ✅ Optional if axiosClient already sets this
+              },
+              withCredentials: true, // ✅ If you're sending cookies
             }
           );
           console.log("✅ Application status updated to Accepted");

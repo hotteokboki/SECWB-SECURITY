@@ -33,15 +33,14 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
-              method: "GET",
-              credentials: "include", // Required to send session cookie
+              withCredentials: true,
             }
           );
 
-          const data = await res.json();
+          const data = res.data;
           const program = data[0]?.name;
           response = await axiosClient.get(`/api/top-se-performance`, {
             params: { period, program },

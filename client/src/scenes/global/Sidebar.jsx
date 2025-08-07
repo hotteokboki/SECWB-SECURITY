@@ -102,7 +102,7 @@ const Sidebar = ({ }) => {
       "/admin": "Manage Users",
       "/mentorships": "Manage Mentorships",
       "/analytics-mentorship": "Show Analytics",
-      "/programs": "Manage Programs",
+      "/api/programs": "Manage Programs",
       "/signup": "Register Mentor",
       "/financial-analytics": "Financial Analytics",
     };
@@ -259,7 +259,7 @@ const Sidebar = ({ }) => {
               <>
                 <Item title="Dashboard" to="/dashboard/mentor" icon={<GridViewOutlinedIcon />} selected={selected} setSelected={setSelected} />
                 <Item title="Evaluate" to="/assess" icon={<AssignmentTurnedInOutlinedIcon />} selected={selected} setSelected={setSelected} />
-                <Item title="Manage Mentorships" to="/mentorships" icon={<SupervisorAccountOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                <Item title="Manage Mentorships" to="/api/mentorships" icon={<SupervisorAccountOutlinedIcon />} selected={selected} setSelected={setSelected} />
                 <MenuItem
                   active={selected === "Scheduling Matrix"}
                   icon={<CalendarMonthOutlinedIcon />}

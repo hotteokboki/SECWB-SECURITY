@@ -94,9 +94,8 @@ const Topbar = ({}) => {
   }, [user]);
 
   const markNotificationAsRead = async (notificationId) => {
-    await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/notifications/${notificationId}/read`, {
-      method: "PUT",
-      credentials: "include",
+    await axiosClient.put(`${process.env.REACT_APP_API_BASE_URL}/api/notifications/${notificationId}/read`, {
+      withCredentials: true, // ✅ If you need to send cookies/session
     });
 
     // Update local state

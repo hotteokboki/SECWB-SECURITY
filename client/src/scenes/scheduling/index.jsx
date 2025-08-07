@@ -107,18 +107,14 @@ const Scheduling = ({}) => {
     try {
       const { id, mentorship_id, realDate, realTime, zoom } = schedule;
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/approveMentorship`,
+      const response = await axiosClient.post(
+        `${process.env.REACT_APP_API_BASE_URL}/api/approveMentorship`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mentoring_session_id: id,
-            mentorship_id,
-            mentorship_date: realDate,
-            mentorship_time: realTime,
-            zoom_link: zoom,
-          }),
+          mentoring_session_id: id,
+          mentorship_id,
+          mentorship_date: realDate,
+          mentorship_time: realTime,
+          zoom_link: zoom,
         }
       );
 
@@ -248,14 +244,10 @@ const Scheduling = ({}) => {
     try {
       const { id } = schedule;
 
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/declineMentorship`,
+      const response = await axiosClient.post(
+        `${process.env.REACT_APP_API_BASE_URL}/api/declineMentorship`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mentoring_session_id: id,
-          }),
+          mentoring_session_id: id,
         }
       );
 
@@ -369,7 +361,7 @@ const Scheduling = ({}) => {
         if (isLSEEDUser) {
           let lseedResponse;
           if (roles.includes("LSEED-Coordinator")) {
-            const programRes = await axios.get(
+            const programRes = await axiosClient.get(
               `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
               {
                 withCredentials: true,
@@ -720,7 +712,7 @@ const Scheduling = ({}) => {
         let response;
 
         if (user?.roles.includes("LSEED-Coordinator")) {
-          const res = await axios.get(
+          const res = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
             {
               withCredentials: true, // Equivalent to credentials: "include"

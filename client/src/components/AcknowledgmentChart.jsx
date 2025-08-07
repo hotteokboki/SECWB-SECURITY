@@ -15,52 +15,40 @@ const AcknowledgmentChart = ({}) => {
 
   useEffect(() => {
     const fetchAckData = async () => {
-      
-      let response;
-      
       try {
+        let response;
 
         if (isCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
-          });
+          const res = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
+            {
+              withCredentials: true,
+            }
+          );
 
-          if (!res.ok) {
-            throw new Error("Failed to fetch program coordinator");
-          }
-
-          const data = await res.json();
+          const data = res.data;
           const program = data[0]?.name;
 
           if (!program) {
             throw new Error("No program found for this coordinator");
           }
 
-          response = await axiosClient(
-            `/api/ack-data?program=${program}`
-          );
-        }
-        else {
-          response = await axiosClient(
-            `/api/ack-data`
-          );
+          response = await axiosClient.get(`/api/ack-data?program=${program}`);
+        } else {
+          response = await axiosClient.get(`/api/ack-data`);
         }
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch ack data");
-        }
+        const rawData = response.data;
 
-        const rawData = await response.json();
         const formattedData = rawData.map((item) => ({
-          batch: item.se_name, // 🔹 Using SE name for readability
+          batch: item.se_name,
           acknowledged: Number(item.acknowledged_percentage) || 0,
           pending: Number(item.pending_percentage) || 0,
         }));
 
         setAckData(formattedData);
       } catch (error) {
-        console.error("❌ Error fetching acknowledgment data:", error);
+        console.error("Error fetching acknowledgment data:", error);
         setAckData([]);
       }
     };

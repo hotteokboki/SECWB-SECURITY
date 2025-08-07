@@ -52,11 +52,10 @@ const ProgramPage = () => {
         setLoading(true);
         setError(null);
 
-        const programsResponse = await fetch(
+        const programsResponse = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/api/get-programs`
         );
-        if (!programsResponse.ok) throw new Error("Failed to fetch programs");
-        const programsData = await programsResponse.json();
+        const programsData = programsResponse.data;
 
         const mappedPrograms = programsData.map((item) => ({
           ...item,
@@ -124,12 +123,11 @@ const ProgramPage = () => {
         user_id: coordinatorIdToAssign,
       };
 
-      const response = await fetch(
+      const response = await axiosClient.post(
         `${process.env.REACT_APP_API_BASE_URL}/api/assign-program-coordinator`,
+        payload,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" }
         }
       );
 
@@ -190,7 +188,7 @@ const ProgramPage = () => {
       }
 
       // Send the program data to the backend
-      const response = await axios.post(
+      const response = await axiosClient.post(
         `${process.env.REACT_APP_API_BASE_URL}/api/programs`,
         programFormData
       );

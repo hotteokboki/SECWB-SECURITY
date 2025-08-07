@@ -33,12 +33,11 @@ const Analytics = ( {}) => {
       try {
         let response;
         if (isLSEEDCoordinator) {
-          const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            method: "GET",
-            credentials: "include", // Required to send session cookie
+          const res = await axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
+              withCredentials: true,
           });
 
-          const data = await res.json();
+          const data = res.data;
           const program = data[0]?.name;
 
           response = await axiosClient(

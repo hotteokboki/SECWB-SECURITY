@@ -103,7 +103,7 @@ const EvaluatePage = ({}) => {
     const fetchPrograms = async () => {
       try {
         setIsLoadingPrograms(true);
-        const response = await axios.get(
+        const response = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/getPrograms`
         );
         setPrograms(response.data); // Store fetched programs in state
@@ -168,11 +168,10 @@ const EvaluatePage = ({}) => {
           let lseedResponse;
 
           if (user?.roles.includes("LSEED-Coordinator")) {
-            const res = await fetch(
+            const res = await axiosClient.get(
               `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
               {
-                method: "GET",
-                credentials: "include", // Required to send session cookie
+                withCredentials: true,
               }
             );
 
@@ -186,12 +185,12 @@ const EvaluatePage = ({}) => {
             if (!program) {
               throw new Error("No program found for this coordinator");
             }
-            lseedResponse = await axios.get(
+            lseedResponse = await axiosClient.get(
               `${process.env.REACT_APP_API_BASE_URL}/getAllEvaluations?program=${program}`,
               { withCredentials: true }
             );
           } else {
-            lseedResponse = await axios.get(
+            lseedResponse = await axiosClient.get(
               `${process.env.REACT_APP_API_BASE_URL}/getAllEvaluations`,
               { withCredentials: true }
             );

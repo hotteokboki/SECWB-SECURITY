@@ -2053,7 +2053,7 @@ app.get('/api/check-mentor-application-status', async (req, res) => {
 });
 // SUBA PARTS ABOVE
 
-// DIEGO PARTS BELOW
+// DIEGO PARTS BELOW CHECK
 app.get("/api/get-programs", async (req, res) => {
   try {
     const programCoordinators = await getProgramCoordinators(); // Fetch users from DB
@@ -2122,7 +2122,7 @@ app.get("/api/get-program-coordinator", async (req, res) => {
   }
 });
 
-app.get("/userDetails", (req, res) => {
+app.get("/api/userDetails", (req, res) => {
   // Check if the session is authenticated
   if (req.session && req.session.isAuth && req.session.user) {
     // Return only what's necessary
@@ -2821,7 +2821,7 @@ app.get("/api/list-mentor-applications", async (req, res) => {
 });
 //CARLOS PARTS ABOVE
 
-// DIEGO PARTS BELOW
+// DIEGO PARTS BELOW check 
 // PUT route to update application status
 app.put("/api/application/:id/status", async (req, res) => {
   const { id } = req.params;
@@ -2928,7 +2928,7 @@ app.put("/api/notifications/:notificationId/read", async (req, res) => {
 });
 
 // API endpoint to fetch all programs
-app.get("/getPrograms", async (req, res) => {
+app.get("/api/getPrograms", async (req, res) => {
   try {
     const programs = await getPrograms(); // Fetch programs from the controller
     res.json(programs); // Send the programs as JSON
@@ -2938,7 +2938,7 @@ app.get("/getPrograms", async (req, res) => {
   }
 });
 
-app.get("/getProgramIdByName/:name", async (req, res) => {
+app.get("/api/getProgramIdByName/:name", async (req, res) => {
   const { name } = req.params;
 
   try {
@@ -2967,7 +2967,7 @@ app.get("/api/active-mentors", async (req, res) => {
 });
 
 // Fetch active mentors
-app.get("/getAllEvaluations", async (req, res) => {
+app.get("/api/getAllEvaluations", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
@@ -2990,7 +2990,7 @@ app.get("/api/social-enterprises-without-mentor", async (req, res) => {
   }
 });
 
-app.get("/getSocialEnterprisesByID", async (req, res) => {
+app.get("/api/getSocialEnterprisesByID", async (req, res) => {
   try {
     const { se_id } = req.query; // Extract mentor_id from query parameters
 
@@ -3083,7 +3083,7 @@ app.post("/api/social-enterprises", async (req, res) => {
   }
 });
 
-app.put("/updateSocialEnterprise/:se_id", async (req, res) => {
+app.put("/api/updateSocialEnterprise/:se_id", async (req, res) => {
   const { se_id } = req.params;
   const updatedData = req.body;
   
@@ -3100,7 +3100,7 @@ app.put("/updateSocialEnterprise/:se_id", async (req, res) => {
   }
 });
 
-app.get("/heatmap-stats", async (req, res) => {
+app.get("/api/heatmap-stats", async (req, res) => {
   try {
     const { period, program } = req.query; // Get period from query params
     const result = await getStatsForHeatmap(period, program);
@@ -4612,7 +4612,7 @@ app.post("/api/mentorships", async (req, res) => {
   }
 });
 
-app.post("/approveMentorship", async (req, res) => {
+app.post("/api/approveMentorship", async (req, res) => {
   const { mentoring_session_id, mentorship_id, mentorship_date, mentorship_time, zoom_link } = req.body;
 
   try {
@@ -4686,7 +4686,7 @@ app.post("/approveMentorship", async (req, res) => {
   }
 });
 
-app.post("/declineMentorship", async (req, res) => {
+app.post("/api/declineMentorship", async (req, res) => {
   const { mentoring_session_id } = req.body;
 
   console.log("Declining mentorship with ID:", mentoring_session_id);
@@ -4723,7 +4723,7 @@ app.post("/declineMentorship", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
-// DIEGO PARTS ABOVE
+// DIEGO PARTS ABOVE check 
 
 // RONALDO PARTS BELOW
 app.post("/updateMentorshipDate", async (req, res) => {

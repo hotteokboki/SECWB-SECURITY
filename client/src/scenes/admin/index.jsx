@@ -236,13 +236,10 @@ const AdminPage = () => {
     console.log("Updating user:", updatedRow);
 
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL}/api/admin/users/${updatedRow.user_id}`, // ✅ Use `user_id`
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedRow),
-        }
+
+      const response = await axiosClient.put(
+        `${process.env.REACT_APP_API_BASE_URL}/api/admin/users/${updatedRow.user_id}`,
+        updatedRow // ✅ This will be JSON-stringified automatically by Axios
       );
 
       if (!response.ok) {

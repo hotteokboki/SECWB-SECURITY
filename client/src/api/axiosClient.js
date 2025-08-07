@@ -10,12 +10,15 @@ const axiosClient = axios.create({
 });
 
 axiosClient.interceptors.request.use((config) => {
-  if (config.method === 'post') {
-    const csrf = getGlobalCsrfToken();
-    if (csrf) {
-      config.headers['X-CSRF-Token'] = csrf;
-    }
+  const csrf = getGlobalCsrfToken();
+
+  // Apply CSRF token to state-changing methods
+  const methodsRequiringCSRF = ['post', 'put', 'patch', 'delete'];
+
+  if (methodsRequiringCSRF.includes(config.method) && csrf) {
+    config.headers['X-CSRF-Token'] = csrf;
   }
+
   return config;
 });
 

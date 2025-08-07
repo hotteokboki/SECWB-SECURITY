@@ -2175,8 +2175,8 @@ app.get("/api/getAllSocialEnterprisesWithMentorship", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-// RONALDO PARTS BELOW
-app.get("/comparePerformanceScore/:se1/:se2", async (req, res) => {
+// RONALDO PARTS BELOW - DONE 8/4
+app.get("/api/comparePerformanceScore/:se1/:se2", async (req, res) => {
   try {
     const { se1, se2 } = req.params; // Expecting SE IDs
 
@@ -2199,7 +2199,7 @@ app.get("/comparePerformanceScore/:se1/:se2", async (req, res) => {
   }
 });
 
-app.get("/getAllSocialEnterpriseswithMentorID", async (req, res) => {
+app.get("/api/getAllSocialEnterpriseswithMentorID", async (req, res) => {
   try {
     const { mentor_id } = req.query; // Extract mentor_id from query parameters
 
@@ -2214,7 +2214,7 @@ app.get("/getAllSocialEnterpriseswithMentorID", async (req, res) => {
   }
 });
 
-app.get("/getAllSDG", async (req, res) => {
+app.get("/api/getAllSDG", async (req, res) => {
   try {
     const sdgs = await getAllSDG(); // Fetch SDGs from the controller
     res.json(sdgs); // Send the SDGs as JSON
@@ -2224,7 +2224,7 @@ app.get("/getAllSDG", async (req, res) => {
   }
 });
 
-app.get("/get-accepted-application/:id", async (req, res) => {
+app.get("/api/get-accepted-application/:id", async (req, res) => {
   const { id } = req.params;
   try {
     const application = await getAcceptedApplications(id);
@@ -2238,7 +2238,7 @@ app.get("/get-accepted-application/:id", async (req, res) => {
   }
 });
 
-app.get("/getAllSocialEnterprises", async (req, res) => {
+app.get("/api/getAllSocialEnterprises", async (req, res) => {
   try {
     const result = await getAllSocialEnterprises(); // Fetch SEs from DB
     if (!result || result.length === 0) {
@@ -2251,7 +2251,7 @@ app.get("/getAllSocialEnterprises", async (req, res) => {
   }
 });
 
-app.get("/getAllSocialEnterprisesForComparison", async (req, res) => {
+app.get("/api/getAllSocialEnterprisesForComparison", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
@@ -2266,7 +2266,7 @@ app.get("/getAllSocialEnterprisesForComparison", async (req, res) => {
   }
 });
 
-app.get("/getMentorEvaluations", async (req, res) => {
+app.get("/api/getMentorEvaluations", async (req, res) => {
   try {
     const mentor_id = req.session.user?.id;
 
@@ -2317,7 +2317,7 @@ app.get("/api/get-mentor-pending-sessions", async (req, res) => {
   }
 });
 
-app.post("/show-signup-password", async (req, res) => {
+app.post("/api/show-signup-password", async (req, res) => {
   try {
     const otp = await getSignUpPassword();
 
@@ -2328,7 +2328,7 @@ app.post("/show-signup-password", async (req, res) => {
   }
 });
 
-app.get("/getRecentMentorEvaluations", async (req, res) => {
+app.get("/api/getRecentMentorEvaluations", async (req, res) => {
   try {
     const mentor_id = req.session.user?.id; // Safely extract from session
 
@@ -2347,7 +2347,7 @@ app.get("/getRecentMentorEvaluations", async (req, res) => {
   }
 });
 
-app.get("/getUpcomingSchedulesForMentor", async (req, res) => {
+app.get("/api/getUpcomingSchedulesForMentor", async (req, res) => {
   try {
     // DOUBLE CHECK
     const mentor_id = req.session.user?.id; // Safely extract from session
@@ -2387,7 +2387,7 @@ app.get("/api/getMentorEvaluationsBySEID/:se_id", async (req, res) => {
   }
 });
 
-// RONALDO PARTS ABOVE
+// RONALDO PARTS ABOVE - DONE 8/4
 
 // CARLOS PARTS BELOW
 
@@ -4764,8 +4764,8 @@ app.post("/api/declineMentorship", async (req, res) => {
 });
 // DIEGO PARTS ABOVE check 
 
-// RONALDO PARTS BELOW
-app.post("/updateMentorshipDate", async (req, res) => {
+// RONALDO PARTS BELOW - DONE  8/4
+app.post("/api/updateMentorshipDate", async (req, res) => {
   console.log("🔹 Received request at /updateMentorshipDate");
 
   const {
@@ -4861,7 +4861,7 @@ app.post("/updateMentorshipDate", async (req, res) => {
   }
 });
 
-app.get("/getMentorshipDates", async (req, res) => {
+app.get("/api/getMentorshipDates", async (req, res) => {
   const { mentor_id } = req.query;
   // console.log("server/getMentorshipDate: mentor_id: ", mentor_id);
 
@@ -5142,7 +5142,7 @@ app.get("/api/financial-statements", async (req, res) => {
   }
 });
 
-// RONALDO PARTS ABOVE
+// RONALDO PARTS ABOVE - DONE 8/4
 
 // Serve Static Files
 app.use(express.static(path.join(__dirname, 'client/build')));

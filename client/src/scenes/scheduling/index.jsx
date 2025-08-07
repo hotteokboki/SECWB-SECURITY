@@ -303,7 +303,7 @@ const Scheduling = ({}) => {
     const fetchMentorshipDates = async () => {
       try {
         console.log("mentor_id: ", user.id);
-        const response = await axios.get(
+        const response = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/getMentorshipDates`,
           {
             params: { mentor_id: user.id }, // Fetch mentorships for this mentor
@@ -323,7 +323,7 @@ const Scheduling = ({}) => {
   useEffect(() => {
     const fetchMentorPendingSessions = async () => {
       try {
-        const res = await axios.get(
+        const res = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/api/get-mentor-pending-sessions`,
           {
             withCredentials: true,
@@ -349,7 +349,7 @@ const Scheduling = ({}) => {
         const isLSEEDUser = roles.some((role) => role.startsWith("LSEED"));
 
         if (isMentor) {
-          const mentorRes = await axios.get(
+          const mentorRes = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/api/mentorSchedulesByID`,
             {
               withCredentials: true,
@@ -549,30 +549,28 @@ const Scheduling = ({}) => {
 
       console.log("📤 Sending Data:", requestBody);
 
-      const response = await fetch(
+      const response = await axiosClient.post(
         `${process.env.REACT_APP_API_BASE_URL}/updateMentorshipDate`,
+        requestBody,
         {
-          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
+          withCredentials: true,
         }
       );
 
-      if (!response.ok) {
-        const errorMessage = await response.json().catch(() => response.text());
-        throw new Error(`Failed to update: ${JSON.stringify(errorMessage)}`);
-      }
+      const data = response.data;
 
       setSnackbarMessage(
-        `Mentoring Session with ${teamName} on ${displayDate} at ${displayStartTime} - ${displayEndTime} scheduled successfully!`
+      `Mentoring Session with ${teamName} on ${displayDate} at ${displayStartTime} - ${displayEndTime} scheduled successfully!`
       );
       setSnackbarSeverity("success");
       setSnackbarOpen(true);
       handleCloseSEModal();
 
       setTimeout(() => {
-        window.location.reload();
+      window.location.reload();
       }, 5000);
+
     } catch (error) {
       console.error("❌ Error updating mentorship date:", error.message);
       let message = error.message;

@@ -206,7 +206,7 @@ const Dashboard = ({}) => {
         let response;
 
         if (hasMentorRole) {
-          response = await axios.get(
+          response = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/getRecentMentorEvaluations`,
             {
               withCredentials: true,
@@ -250,7 +250,7 @@ const Dashboard = ({}) => {
         let response;
 
         if (hasMentorRole) {
-          response = await axios.get(
+          response = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/getUpcomingSchedulesForMentor`,
             {
               withCredentials: true,

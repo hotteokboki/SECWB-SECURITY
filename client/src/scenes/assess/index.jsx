@@ -145,7 +145,7 @@ const EvaluatePage = ({}) => {
         const isLSEEDUser = roles.some((role) => role.startsWith("LSEED"));
 
         if (isMentor) {
-          const mentorResponse = await axios.get(
+          const mentorResponse = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/getMentorEvaluations`,
             { withCredentials: true }
           );

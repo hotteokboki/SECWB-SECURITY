@@ -70,7 +70,7 @@ const SEAnalytics = () => {
   const [cashFlowRaw, setCashFlowRaw] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
 
-  useEffect(() => {
+ useEffect(() => {
     const fetchApplicationDetails = async () => {
       if (!selectedSE || !selectedSE.accepted_application_id) {
         setSEApplication(null);
@@ -78,12 +78,11 @@ const SEAnalytics = () => {
       }
 
       try {
-        const res = await fetch(
+       const res = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/get-accepted-application/${selectedSE.accepted_application_id}`
         );
-        if (!res.ok) throw new Error("Failed to fetch application details");
 
-        const data = await res.json();
+        const data = res.data;
         setSEApplication(data);
       } catch (error) {
         console.error("Error fetching application details:", error);
@@ -91,8 +90,9 @@ const SEAnalytics = () => {
       }
     };
 
-    fetchApplicationDetails();
-  }, [selectedSE]);
+  fetchApplicationDetails();
+}, [selectedSE]);
+
 
   useEffect(() => {
     const fetchData = async () => {

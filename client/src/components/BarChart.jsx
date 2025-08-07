@@ -76,12 +76,12 @@ const BarChart = ( {} ) => {
           
           const program = res.data[0]?.name;
             
-          response = await axios.get(
+          response = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesForComparison`,
             { params: { program } }
           );
         } else {
-          response = await axios.get(
+          response = await axiosClient.get(
             `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesForComparison`
           );
         }
@@ -102,7 +102,7 @@ const BarChart = ( {} ) => {
   const fetchComparisonData = async (se1, se2) => {
     setLoading(true);
     try {
-      const response = await axios.get(
+      const response = await axiosClient.get(
         `${process.env.REACT_APP_API_BASE_URL}/comparePerformanceScore/${se1}/${se2}`
       );
       console.log("Fetched Comparison Data:", response.data);

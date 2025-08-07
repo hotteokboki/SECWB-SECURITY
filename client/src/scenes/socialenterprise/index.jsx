@@ -243,10 +243,10 @@ const SocialEnterprise = ({}) => {
   useEffect(() => {
     const fetchSDGs = async () => {
       try {
-        const response = await fetch(
+        const response = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/getAllSDG`
         ); // Call the API endpoint
-        const data = await response.json();
+        const data = response.data;
         setSdgs(data); // Update the state with the fetched SDGs
       } catch (error) {
         console.error("Error fetching SDGs:", error);

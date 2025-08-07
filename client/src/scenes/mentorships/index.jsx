@@ -101,26 +101,26 @@ const Mentorships = () => {
 
   const handleGenerateOTP = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/show-signup-password`, {
-        method: "POST",
-        credentials: "include",  // if you need session
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await axiosClient.post(
+        `${process.env.REACT_APP_API_BASE_URL}/show-signup-password`,
+        {}, 
+        {
+          withCredentials: true, 
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to generate OTP");
-      }
-
-      const data = await response.json();
+      const data = response.data;
       setGeneratedOTP(data.otp);
       setOtpDialogOpen(true);
     } catch (error) {
       console.error("Error generating OTP:", error);
-      alert("Failed to generate OTP. Please try again.");
+        alert("Failed to generate OTP. Please try again.");
     }
   };
+
 
   // Fetch social enterprises from the backend
   useEffect(() => {
@@ -128,7 +128,7 @@ const Mentorships = () => {
       try {
         const mentor_id = userSession.id; // Replace with actual mentor ID
 
-        const response = await axios.get(
+        const response = await axiosClient.get(
           `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterpriseswithMentorID`,
           { params: { mentor_id } } // Pass mentor_id as a query parameter
         );

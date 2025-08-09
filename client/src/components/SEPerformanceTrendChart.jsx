@@ -1,12 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Box,
-  Typography,
-  Select,
-  MenuItem,
-  Tooltip,
-  IconButton,
-} from "@mui/material";
+import { Box, Typography, Select, MenuItem, Tooltip, IconButton, Button } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LineChart from "./LineChart";
 import { useTheme } from "@mui/material";
@@ -20,12 +13,12 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
   const [topPerformers, setTopPerformers] = useState([]);
   const [period, setPeriod] = useState("overall");
   const [topPerformer, setTopPerformer] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0); // for pagination
+  const SEsPerPage = 5;
   const { user } = useAuth();
   const isCoordinator = user?.roles?.includes("LSEED-Coordinator");
   const isMentor = user?.roles?.includes("Mentor");
-
-  // KEN MAY BUG DITO
-  // Sa debug lumalabas na true kahit ung mode ko sa system is mentor mode, dapat false na yan
 
   useEffect(() => {
     const fetchTopPerformers = async () => {
@@ -33,32 +26,19 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
         let response;
 
         if (isCoordinator) {
-          const res = await fetch(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              method: "GET",
-              credentials: "include", // Required to send session cookie
-            }
-          );
+          const res = await axiosClient.get(`/api/get-program-coordinator`, {
+          });
 
-          const data = await res.json();
+          const data = await res.data;
           const program = data[0]?.name;
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/top-se-performance?period=${period}&program=${program}`,
-            {
-              withCredentials: true,
-            }
-          );
+            `/api/top-se-performance?period=${period}&program=${program}`);
         } else {
-          response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/top-se-performance?period=${period}&se_id=${selectedSEId}`,
-            {
-              withCredentials: true,
-            }
-          );
+          response = await fetch(
+            `/api/top-se-performance?period=${period}&se_id=${selectedSEId}`);
         }
 
-        const data = response.data;
+        const data = await response.data;
         const formattedData = Array.isArray(data) ? data : [];
 
         setTopPerformers(formattedData);
@@ -97,8 +77,8 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
     fetchTopPerformers();
   }, [period]); // Only depends on period
 
-  const formatChartData = (data) => {
-    if (!data.length) return [];
+  const formatChartData = (dataSlice, fullData) => {
+    if (!dataSlice.length) return [];
 
     const groupedData = {};
     const colorList = [
@@ -109,30 +89,25 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
       colors.grey[500],
     ];
 
-    // 1. Extract all unique quarters (period labels) from data
+    // 1. Extract all unique quarters
     const allPeriodsSet = new Set();
-    data.forEach(({ quarter_start }) => {
+    fullData.forEach(({ quarter_start }) => {
       const date = new Date(quarter_start);
-      const periodLabel = `${date.getFullYear()}-Q${
-        Math.floor(date.getMonth() / 3) + 1
-      }`;
+      const periodLabel = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
       allPeriodsSet.add(periodLabel);
     });
 
-    // 2. Sort quarters chronologically (by year and quarter number)
     const allPeriods = Array.from(allPeriodsSet).sort((a, b) => {
-      const [aYear, aQ] = a.split("-Q").map(Number);
-      const [bYear, bQ] = b.split("-Q").map(Number);
+      const [aYear, aQ] = a.split('-Q').map(Number);
+      const [bYear, bQ] = b.split('-Q').map(Number);
       if (aYear !== bYear) return aYear - bYear;
       return aQ - bQ;
     });
 
-    // 3. Group ratings by social_enterprise and quarter
-    data.forEach(({ social_enterprise, quarter_start, avg_rating }) => {
+    // 2. Group ratings by SE and quarter
+    fullData.forEach(({ social_enterprise, quarter_start, avg_rating }) => {
       const date = new Date(quarter_start);
-      const periodLabel = `${date.getFullYear()}-Q${
-        Math.floor(date.getMonth() / 3) + 1
-      }`;
+      const periodLabel = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
 
       if (!groupedData[social_enterprise]) {
         groupedData[social_enterprise] = {};
@@ -140,24 +115,56 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
       groupedData[social_enterprise][periodLabel] = parseFloat(avg_rating);
     });
 
-    // 4. For each social enterprise, build data array with all quarters, filling missing with null
-    return Object.keys(groupedData).map((seName, index) => {
+    // Get unique SEs in dataSlice
+    const uniqueSEs = [...new Set(dataSlice.map((d) => d.social_enterprise))];
+
+    // Get SE ranking order from fullData
+    const fullSEOrder = [...new Set(fullData.map((d) => d.social_enterprise))];
+
+    // Sort SEs based on rank order in fullData (ascending)
+    const sortedSEs = [...uniqueSEs].sort((a, b) => {
+      return fullSEOrder.indexOf(b) - fullSEOrder.indexOf(a);
+    });
+
+    const truncateName = (name, maxLength = 18) => {
+      return name.length > maxLength ? name.slice(0, maxLength - 3) + "…" : name;
+    };
+
+    // Map sorted SEs to chart data
+    return sortedSEs.map((seName, index) => {
+      const rankIndex = fullSEOrder.findIndex(se => se === seName) + 1;
+
       const seData = allPeriods.map((period) => ({
         x: period,
-        y: groupedData[seName][period] ?? 0,
+        y: groupedData[seName]?.[period] ?? 0,
       }));
 
       return {
-        id: seName,
+        id: truncateName(`${rankIndex}. ${seName}`),
         color: colorList[index % colorList.length],
         data: seData,
       };
     });
+
   };
 
-  const chartData = formatChartData(topPerformers);
+  const groupBySE = topPerformers.reduce((acc, item) => {
+    if (!acc[item.social_enterprise]) {
+      acc[item.social_enterprise] = [];
+    }
+    acc[item.social_enterprise].push(item);
+    return acc;
+  }, {});
 
-  console.log("Chart Data: ", chartData);
+  const seGroups = Object.values(groupBySE); // Array of arrays, one per SE
+
+  const paginatedSEGroups = showAll
+    ? seGroups.slice(currentPage * SEsPerPage, (currentPage + 1) * SEsPerPage)
+    : seGroups.slice(0, SEsPerPage);
+
+  const paginatedRows = paginatedSEGroups.flat();
+
+  const chartData = formatChartData(paginatedRows, topPerformers);
 
   return (
     <Box
@@ -181,7 +188,9 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
               fontWeight="bold"
               color={colors.greenAccent[500]}
             >
-              {chartData.length === 0 ? "No Data" : "SE Performance Trend"}
+              {chartData.length === 0
+                ? "No Data"
+                : `SE Performance Trend (${showAll ? "All" : "Top 5"})`}
             </Typography>
 
             {topPerformer && (
@@ -191,7 +200,9 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
                 color={colors.blueAccent[500]}
                 mt={1}
               >
-                Top Performer ({period}): {topPerformer}
+                {chartData.length === 0
+                  ? "No Data"
+                  : `Top Performer (${period}): ${topPerformer}`}
               </Typography>
             )}
           </Box>
@@ -205,39 +216,24 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
                 </Typography>
 
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  This chart visualizes how{" "}
-                  <strong>Social Enterprises (SEs)</strong> perform across
-                  quarters based on their mentor evaluation ratings.
+                  This chart visualizes how <strong>Social Enterprises (SEs)</strong> perform across quarters based on their mentor evaluation ratings.
                 </Typography>
 
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="body2">
-                    🔹{" "}
-                    <strong style={{ color: colors.greenAccent[500] }}>
-                      Rising Line
-                    </strong>{" "}
-                    – The SE's average ratings have improved over time.
+                    🔹 <strong style={{ color: colors.greenAccent[500] }}>Rising Line</strong> – The SE's average ratings have improved over time.
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    ⏸️{" "}
-                    <strong style={{ color: colors.grey[300] }}>
-                      Flat Line
-                    </strong>{" "}
-                    – Performance remained stable across periods.
+                    ⏸️ <strong style={{ color: colors.grey[300] }}>Flat Line</strong> – Performance remained stable across periods.
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    🔻{" "}
-                    <strong style={{ color: "#f44336" }}>Falling Line</strong> –
-                    Ratings have declined, indicating challenges or lack of
-                    progress.
+                    🔻 <strong style={{ color: "#f44336" }}>Falling Line</strong> – Ratings have declined, indicating challenges or lack of progress.
                   </Typography>
                 </Box>
 
                 <Typography variant="body2" sx={{ mt: 2 }}>
-                  The performance is based on{" "}
-                  <strong>average star ratings</strong> from mentor evaluations
-                  across key categories like Finance, Marketing, Logistics, and
-                  others.
+                  The performance is based on <strong>average star ratings</strong> from mentor evaluations across key categories
+                  like Finance, Marketing, Logistics, and others.
                 </Typography>
 
                 <Typography variant="body2" sx={{ mt: 1 }}>
@@ -245,19 +241,15 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
                 </Typography>
                 <Box sx={{ pl: 1 }}>
                   <Typography variant="body2">
-                    • A <strong>weighted average score</strong> is calculated
-                    using <em>average × number of evaluations</em>.
+                    • A <strong>weighted average score</strong> is calculated using <em>average × number of evaluations</em>.
                   </Typography>
                   <Typography variant="body2">
-                    • Only the <strong>Top 3 SEs</strong> (highest weighted
-                    average) are shown.
+                    • Only the <strong>Top 3 SEs</strong> (highest weighted average) are shown.
                   </Typography>
                 </Box>
 
                 <Typography variant="body2" sx={{ mt: 2 }}>
-                  Switch between <strong>Overall</strong>,{" "}
-                  <strong>Quarterly</strong>, and <strong>Yearly</strong> to
-                  compare performance over different time periods.
+                  Switch between <strong>Overall</strong>, <strong>Quarterly</strong>, and <strong>Yearly</strong> to compare performance over different time periods.
                 </Typography>
               </Box>
             }
@@ -268,37 +260,127 @@ const SEPerformanceTrendChart = ({ selectedSEId = null }) => {
               <HelpOutlineIcon />
             </IconButton>
           </Tooltip>
+
         </Box>
 
-        {/* Right side - Period Select Dropdown */}
-        <Select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          sx={{
-            minWidth: 120,
-            bordercolor: colors.grey[100],
-            backgroundColor: colors.blueAccent[600],
-            color: colors.grey[100],
-          }}
-        >
-          <MenuItem value="overall">Overall</MenuItem>
-          <MenuItem value="quarterly">Quarterly</MenuItem>
-          <MenuItem value="yearly">Yearly</MenuItem>
-        </Select>
+        {/* Right side - Period Select + Show All */}
+        <Box display="flex" alignItems="center" gap={1}>
+          <Select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            sx={{
+              height: "40px",         // Match button height
+              minWidth: 120,          // Match button width
+              backgroundColor: colors.blueAccent[600],
+              color: colors.grey[100],
+              bordercolor: colors.grey[100],
+              fontWeight: "bold",
+              "& .MuiSelect-icon": {
+                color: colors.grey[100], // dropdown arrow color
+              },
+              "& fieldset": {
+                border: "none",         // remove default border
+              },
+            }}
+          >
+            <MenuItem value="overall">Overall</MenuItem>
+            <MenuItem value="quarterly">Quarterly</MenuItem>
+            <MenuItem value="yearly">Yearly</MenuItem>
+          </Select>
+
+          <Button
+            variant="outlined"
+            onClick={() => {
+              setShowAll((prev) => !prev);
+              setCurrentPage(0); // reset page when toggling
+            }}
+            sx={{
+              height: "40px", // match Select height
+              minWidth: 120,   // match Select width
+              bordercolor: colors.grey[100],
+              backgroundColor: colors.blueAccent[600],
+              color: colors.grey[100],
+              fontWeight: "bold",
+              "&:hover": {
+                backgroundColor: colors.blueAccent[700],
+              },
+            }}
+          >
+            {showAll ? "Show Top 5" : "Show All"}
+          </Button>
+        </Box>
       </Box>
 
       <Box
         height="320px"
         display="flex"
-        justifyContent="center"
         alignItems="center"
       >
-        {chartData.length === 0 ? (
-          <Typography variant="h6" color={colors.grey[300]} textAlign="center">
-            No data available for plotting.
-          </Typography>
-        ) : (
-          <LineChart data={chartData} />
+        {/* Prev Button - Only when showAll */}
+        {showAll && (
+          <Button
+            variant="contained"
+            color="secondary"
+            disabled={currentPage === 0}
+            onClick={() => setCurrentPage((prev) => prev - 1)}
+            sx={{
+              mx: 2,
+              height: "fit-content",
+              backgroundColor: colors.blueAccent[600],
+              color: colors.grey[100],
+              "&:disabled": {
+                backgroundColor: colors.grey[600],
+                color: colors.grey[300],
+              },
+            }}
+          >
+            ◀ Prev
+          </Button>
+        )}
+
+        {/* Chart */}
+        <Box
+          flexGrow={1}
+          minWidth={0}
+          overflow="hidden"
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          height="100%"
+          sx={{
+            pl: showAll ? 0 : 2,
+            pr: showAll ? 0 : 2,
+          }}
+        >
+          {chartData.length === 0 ? (
+            <Typography variant="h6" color={colors.grey[300]} textAlign="center">
+              No data available for plotting.
+            </Typography>
+          ) : (
+            <LineChart data={chartData} />
+          )}
+        </Box>
+
+        {/* Next Button - Only when showAll */}
+        {showAll && (
+          <Button
+            variant="contained"
+            color="secondary"
+            disabled={(currentPage + 1) * SEsPerPage >= seGroups.length}
+            onClick={() => setCurrentPage((prev) => prev + 1)}
+            sx={{
+              mx: 2,
+              height: "fit-content",
+              backgroundColor: colors.blueAccent[600],
+              color: colors.grey[100],
+              "&:disabled": {
+                backgroundColor: colors.grey[600],
+                color: colors.grey[300],
+              },
+            }}
+          >
+            Next ▶
+          </Button>
         )}
       </Box>
     </Box>

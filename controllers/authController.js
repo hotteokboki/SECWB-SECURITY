@@ -65,8 +65,6 @@ exports.login = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
-   console.log('POST /api/auth/forgot-password hit for email:', email);
-  
   try {
     // 1. Find the user by email
     const userQuery = await pgDatabase.query('SELECT * FROM users WHERE email = $1', [email]);

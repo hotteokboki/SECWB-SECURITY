@@ -23,7 +23,7 @@ import {
   Checkbox,
   FormHelperText,
   Menu,
-  Grid,
+  Grid
 } from "@mui/material";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
@@ -32,14 +32,11 @@ import Header from "../../components/Header";
 import SEPerformanceTrendChart from "../../components/SEPerformanceTrendChart";
 import { useNavigate } from "react-router-dom"; // For navigation
 import { useAuth } from "../../context/authContext";
-import axiosClient from "../../api/axiosClient";
 
-const SocialEnterprise = ({}) => {
+const SocialEnterprise = ({ }) => {
   const theme = useTheme();
   const { user } = useAuth();
-  const isLSEEDCoordinator = user?.roles?.some((role) =>
-    role?.startsWith("LSEED")
-  );
+  const isLSEEDCoordinator = user?.roles?.some(role => role?.startsWith("LSEED"));
   const hasMentorRole = user?.roles?.includes("Mentor");
   const colors = tokens(theme.palette.mode);
   const navigate = useNavigate(); // Initialize navigation
@@ -50,11 +47,11 @@ const SocialEnterprise = ({}) => {
     numberOfMembers: "",
     selectedProgram: "",
     selectedStatus: "",
-    abbr: "",
+    abbr: "", 
     criticalAreas: [],
     description: "",
     preferred_mentoring_time: [],
-    mentoring_time_note: "",
+    mentoring_time_note:"",
   });
 
   const predefinedTimes = [
@@ -73,6 +70,7 @@ const SocialEnterprise = ({}) => {
   );
   const customTimeValue = customTimes.join(", "); // handle multiple custom values if needed
 
+
   const isOtherChecked =
     selectedTimes.includes("Other") || customTimes.length > 0;
 
@@ -87,7 +85,7 @@ const SocialEnterprise = ({}) => {
   const [sdgs, setSdgs] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [menuRowId, setMenuRowId] = useState(null);
+  const [menuRowId, setMenuRowId] = useState(null); 
   const [openApplicationDialog, setOpenApplicationDialog] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [snackbar, setSnackbar] = useState({
@@ -144,26 +142,33 @@ const SocialEnterprise = ({}) => {
       const team_name = row.team_name;
 
       try {
-        const response = await axiosClient.put(
-          `${process.env.REACT_APP_API_BASE_URL}/api/application/${applicationId}/status`,
-          {
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/application/${applicationId}/status`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
             status: "Declined",
             email: focalEmail,
             team_name: team_name,
-          }
-        );
-
-        console.log("✅ Status updated to Declined.");
-        setSnackbar({
-          open: true,
-          message: "Declined Social Enterprise Application",
-          severity: "success",
+          }),
         });
 
-        await new Promise((r) => setTimeout(r, 1500));
-        window.location.reload();
+        if (response.ok) {
+          console.log("✅ Status updated to Declined.");
+          setSnackbar({
+            open: true,
+            message: "Decline Social Enterprise Application",
+            severity: "success",
+          });
+          
+          await new Promise((r) => setTimeout(r, 1500));
+          window.location.reload();
+        } else {
+          console.error("❌ Failed to decline the application. Response not ok.");
+        }
       } catch (error) {
-        console.error("❌ Failed to decline the application:", error);
+        console.error("❌ Network or server error:", error);
       }
 
       handleCloseMenu(); // Close the dropdown
@@ -189,30 +194,25 @@ const SocialEnterprise = ({}) => {
       try {
         let response;
 
-        if (user?.roles?.includes("LSEED-Coordinator")) {
-          const res = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              withCredentials: true, // Equivalent to credentials: "include"
-            }
-          );
+        if (user?.roles?.includes('LSEED-Coordinator')) {
+          const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
+            withCredentials: true, // Equivalent to credentials: "include"
+          });
 
           const program = res.data[0]?.name;
 
-          response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesWithMentorship`,
+          response = await axios.get(
+            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesWithMentorship`,
             { params: { program } }
           );
         } else {
-          response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesWithMentorship`
-          );
+          response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesWithMentorship`);
         }
-
+        
         const updatedSocialEnterprises = response.data.map((se) => ({
           id: se.se_id,
           name: se.team_name || "Unnamed SE",
-          program: se.program_name || "No Program",
+          program: se.program_name || "No Program", 
           contact: se.contactnum || "No Contact",
           mentors:
             se.mentors.map((m) => m.mentor_name).join(", ") || "No mentor",
@@ -228,7 +228,7 @@ const SocialEnterprise = ({}) => {
 
     const fetchMentors = async () => {
       try {
-        const response = await axiosClient.get(`/api/mentors`); // Fetch mentors from API
+        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/mentors`); // Fetch mentors from API
         setMentors(response.data);
         console.log("mentorsdata", response.data);
       } catch (error) {
@@ -243,10 +243,8 @@ const SocialEnterprise = ({}) => {
   useEffect(() => {
     const fetchSDGs = async () => {
       try {
-        const response = await axiosClient.get(
-          `${process.env.REACT_APP_API_BASE_URL}/getAllSDG`
-        ); // Call the API endpoint
-        const data = response.data;
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/getAllSDG`); // Call the API endpoint
+        const data = await response.json();
         setSdgs(data); // Update the state with the fetched SDGs
       } catch (error) {
         console.error("Error fetching SDGs:", error);
@@ -258,22 +256,17 @@ const SocialEnterprise = ({}) => {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        const response = await axiosClient.get(
-          `${process.env.REACT_APP_API_BASE_URL}/api/list-se-applications`
-        ); // adjust endpoint as needed
-        const data = response.data;
-
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/list-se-applications`); // adjust endpoint as needed
+        const data = await response.json()
+        
         // Format date_applied in all items
         const formatted = data.map((item) => ({
           ...item,
-          date_applied: new Date(item.date_applied).toLocaleDateString(
-            "en-US",
-            {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            }
-          ),
+          date_applied: new Date(item.date_applied).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }),
         }));
         setApplications(formatted);
       } catch (error) {
@@ -289,10 +282,9 @@ const SocialEnterprise = ({}) => {
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const response = await axiosClient.get(
-          `${process.env.REACT_APP_API_BASE_URL}/api/get-All-Programs`
-        ); // Call the API endpoint
-        setPrograms(response.data); // Update the state with the fetched programs
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/getAllPrograms`); // Call the API endpoint
+        const data = await response.json();
+        setPrograms(data); // Update the state with the fetched programs
       } catch (error) {
         console.error("Error fetching programs:", error);
       }
@@ -325,7 +317,7 @@ const SocialEnterprise = ({}) => {
 
   const handleSERowUpdate = async (updatedRow) => {
     try {
-      const response = await axiosClient.put(
+      const response = await axios.put(
         `${process.env.REACT_APP_API_BASE_URL}/updateSocialEnterprise/${updatedRow.id}`,
         updatedRow
       );
@@ -382,25 +374,22 @@ const SocialEnterprise = ({}) => {
         abbr: socialEnterpriseData.abbr || null,
         criticalAreas: socialEnterpriseData.criticalAreas || [],
         description: socialEnterpriseData.description,
-        preferred_mentoring_time:
-          socialEnterpriseData.preferred_mentoring_time || [],
+        preferred_mentoring_time: socialEnterpriseData.preferred_mentoring_time || [],
         mentoring_time_note: socialEnterpriseData.mentoring_time_note || null,
         accepted_application_id: socialEnterpriseData.applicationId,
       };
 
-      const response = await axiosClient.post(
+      const response = await fetch(
         `${process.env.REACT_APP_API_BASE_URL}/api/social-enterprises`,
-        newSocialEnterprise,
         {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          withCredentials: true, // if needed
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newSocialEnterprise),
         }
       );
 
       if (response.ok) {
-        const data = response.data;
+        const data = await response.json();
         console.log(
           "Social Enterprise added successfully with SE ID:",
           data.se_id
@@ -408,16 +397,12 @@ const SocialEnterprise = ({}) => {
 
         // 🔄 Update the application status to "Accepted"
         if (socialEnterpriseData.applicationId) {
-          await axiosClient.put(
+          await fetch(
             `${process.env.REACT_APP_API_BASE_URL}/api/application/${socialEnterpriseData.applicationId}/status`,
             {
-              status: "Accepted", // ✅ This is the body payload
-            },
-            {
-              headers: {
-                "Content-Type": "application/json", // ✅ Optional if axiosClient already sets this
-              },
-              withCredentials: true, // ✅ If you're sending cookies
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "Accepted" }),
             }
           );
           console.log("✅ Application status updated to Accepted");
@@ -440,6 +425,7 @@ const SocialEnterprise = ({}) => {
 
         await new Promise((r) => setTimeout(r, 1500));
         window.location.reload();
+
       } else {
         console.error("Error adding Social Enterprise");
       }
@@ -941,11 +927,7 @@ const SocialEnterprise = ({}) => {
                                 : selected.delete(time);
 
                               // Remove "Other" if at least one predefined is checked
-                              if (
-                                [...selected].some((t) =>
-                                  predefinedTimes.includes(t)
-                                )
-                              ) {
+                              if ([...selected].some((t) => predefinedTimes.includes(t))) {
                                 selected.delete("Other");
                               }
 
@@ -1078,11 +1060,7 @@ const SocialEnterprise = ({}) => {
                   multiline
                   minRows={2}
                   maxRows={4}
-                  value={
-                    socialEnterpriseData.mentoring_time_note?.trim()
-                      ? socialEnterpriseData.mentoring_time_note
-                      : "N/A"
-                  }
+                  value={socialEnterpriseData.mentoring_time_note?.trim() ? socialEnterpriseData.mentoring_time_note : "N/A"}
                   InputProps={{
                     readOnly: true,
                     style: { color: "#000" },
@@ -1299,13 +1277,13 @@ const SocialEnterprise = ({}) => {
           onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          <Alert
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-            severity={snackbar.severity}
-            sx={{ width: "100%" }}
-          >
-            {snackbar.message}
-          </Alert>
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
         </Snackbar>
 
         <Dialog
@@ -1333,9 +1311,7 @@ const SocialEnterprise = ({}) => {
             Application Details
           </DialogTitle>
 
-          <DialogContent
-            sx={{ padding: 3, maxHeight: "70vh", overflowY: "auto" }}
-          >
+          <DialogContent sx={{ padding: 3, maxHeight: "70vh", overflowY: "auto" }}>
             {selectedApplication ? (
               <Grid container spacing={2}>
                 {/* Team Information */}
@@ -1344,64 +1320,21 @@ const SocialEnterprise = ({}) => {
                     About the Team
                   </Typography>
                 </Grid>
-                <Grid item xs={6}>
-                  <strong>Team Name:</strong> {selectedApplication.team_name}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Abbreviation:</strong>{" "}
-                  {selectedApplication.se_abbreviation}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Started:</strong>{" "}
-                  {selectedApplication.enterprise_idea_start}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>People Involved:</strong>{" "}
-                  {selectedApplication.involved_people}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Current Phase:</strong>{" "}
-                  {selectedApplication.current_phase}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Meeting Frequency:</strong>{" "}
-                  {selectedApplication.meeting_frequency}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Social Problem:</strong>{" "}
-                  {selectedApplication.social_problem || <i>Not provided</i>}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Nature:</strong> {selectedApplication.se_nature}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Social Enterprise Description:</strong>{" "}
-                  {selectedApplication.se_description}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Team Characteristics:</strong>{" "}
-                  {selectedApplication.team_characteristics}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Challenges:</strong>{" "}
-                  {selectedApplication.team_challenges}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Critical Areas:</strong>{" "}
-                  {(selectedApplication.critical_areas || []).join(", ")}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Action Plans:</strong>{" "}
-                  {selectedApplication.action_plans}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Communication Modes:</strong>{" "}
-                  {(selectedApplication.communication_modes || []).join(", ")}
-                </Grid>
-                <Grid item xs={12}>
-                  <strong>Social Media:</strong>{" "}
-                  {selectedApplication.social_media_link}
-                </Grid>
+                <Grid item xs={6}><strong>Team Name:</strong> {selectedApplication.team_name}</Grid>
+                <Grid item xs={6}><strong>Abbreviation:</strong> {selectedApplication.se_abbreviation}</Grid>
+                <Grid item xs={6}><strong>Started:</strong> {selectedApplication.enterprise_idea_start}</Grid>
+                <Grid item xs={6}><strong>People Involved:</strong> {selectedApplication.involved_people}</Grid>
+                <Grid item xs={6}><strong>Current Phase:</strong> {selectedApplication.current_phase}</Grid>
+                <Grid item xs={6}><strong>Meeting Frequency:</strong> {selectedApplication.meeting_frequency}</Grid>
+                <Grid item xs={12}><strong>Social Problem:</strong> {selectedApplication.social_problem || <i>Not provided</i>}</Grid>
+                <Grid item xs={12}><strong>Nature:</strong> {selectedApplication.se_nature}</Grid>
+                <Grid item xs={12}><strong>Social Enterprise Description:</strong> {selectedApplication.se_description}</Grid>
+                <Grid item xs={12}><strong>Team Characteristics:</strong> {selectedApplication.team_characteristics}</Grid>
+                <Grid item xs={12}><strong>Challenges:</strong> {selectedApplication.team_challenges}</Grid>
+                <Grid item xs={12}><strong>Critical Areas:</strong> {(selectedApplication.critical_areas || []).join(", ")}</Grid>
+                <Grid item xs={12}><strong>Action Plans:</strong> {selectedApplication.action_plans}</Grid>
+                <Grid item xs={12}><strong>Communication Modes:</strong> {(selectedApplication.communication_modes || []).join(", ")}</Grid>
+                <Grid item xs={12}><strong>Social Media:</strong> {selectedApplication.social_media_link}</Grid>
 
                 {/* Focal Person */}
                 <Grid item xs={12} mt={2}>
@@ -1409,14 +1342,8 @@ const SocialEnterprise = ({}) => {
                     Focal Person
                   </Typography>
                 </Grid>
-                <Grid item xs={6}>
-                  <strong>Email:</strong>{" "}
-                  {selectedApplication.focal_email || <i>Not provided</i>}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Phone:</strong>{" "}
-                  {selectedApplication.focal_phone || <i>Not provided</i>}
-                </Grid>
+                <Grid item xs={6}><strong>Email:</strong> {selectedApplication.focal_email || <i>Not provided</i>}</Grid>
+                <Grid item xs={6}><strong>Phone:</strong> {selectedApplication.focal_phone || <i>Not provided</i>}</Grid>
 
                 {/* Mentoring Preferences */}
                 <Grid item xs={12} mt={2}>
@@ -1424,20 +1351,9 @@ const SocialEnterprise = ({}) => {
                     Mentoring Details
                   </Typography>
                 </Grid>
-                <Grid item xs={12}>
-                  <strong>Team Members:</strong>{" "}
-                  {selectedApplication.mentoring_team_members}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Preferred Time:</strong>{" "}
-                  {(selectedApplication.preferred_mentoring_time || []).join(
-                    ", "
-                  )}
-                </Grid>
-                <Grid item xs={6}>
-                  <strong>Time Notes:</strong>{" "}
-                  {selectedApplication.mentoring_time_note}
-                </Grid>
+                <Grid item xs={12}><strong>Team Members:</strong> {selectedApplication.mentoring_team_members}</Grid>
+                <Grid item xs={6}><strong>Preferred Time:</strong> {(selectedApplication.preferred_mentoring_time || []).join(", ")}</Grid>
+                <Grid item xs={6}><strong>Time Notes:</strong> {selectedApplication.mentoring_time_note}</Grid>
 
                 {/* Pitch Deck */}
                 <Grid item xs={12}>
@@ -1555,7 +1471,11 @@ const SocialEnterprise = ({}) => {
 
       <Box display="flex" gap="20px" width="100%" mt="20px">
         {/* SOCIAL ENTERPRISES TABLE */}
-        <Box flex="2" backgroundColor={colors.primary[400]} padding="20px">
+        <Box
+          flex="2"
+          backgroundColor={colors.primary[400]}
+          padding="20px"
+        >
           <Typography
             variant="h3"
             fontWeight="bold"
@@ -1591,7 +1511,7 @@ const SocialEnterprise = ({}) => {
                 rows={socialEnterprises}
                 columns={columns}
                 getRowId={(row) => row.id}
-                getRowHeight={() => "auto"}
+                getRowHeight={() => 'auto'}
                 processRowUpdate={(params) => {
                   handleSERowUpdate(params);
                   return params;
@@ -1614,7 +1534,7 @@ const SocialEnterprise = ({}) => {
                     wordBreak: "break-word",
                   },
                   "& .MuiDataGrid-toolbarContainer .MuiButton-text": {
-                    color: `${colors.grey[100]} !important`,
+                  color: `${colors.grey[100]} !important`,
                   },
                 }}
                 slots={{ toolbar: GridToolbar }}
@@ -1624,7 +1544,7 @@ const SocialEnterprise = ({}) => {
         </Box>
 
         {/* APPLICATIONS TABLE */}
-        {user?.roles?.includes("LSEED-Director") && (
+        {user?.roles?.includes('LSEED-Director') && (
           <Box
             flex="1"
             backgroundColor={colors.primary[400]}
@@ -1640,11 +1560,7 @@ const SocialEnterprise = ({}) => {
               borderBottom={`4px solid ${colors.primary[500]}`}
               p="15px"
             >
-              <Typography
-                color={colors.greenAccent[500]}
-                variant="h3"
-                fontWeight="600"
-              >
+              <Typography color={colors.greenAccent[500]} variant="h3" fontWeight="600">
                 Applications
               </Typography>
             </Box>
@@ -1722,55 +1638,55 @@ const SocialEnterprise = ({}) => {
                 </Button>
 
                 {menuRowId === list.id && (
-                  <Menu
-                    anchorEl={anchorEl}
-                    open={Boolean(anchorEl)}
-                    onClose={handleCloseMenu}
-                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                    transformOrigin={{ vertical: "top", horizontal: "right" }}
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleCloseMenu}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                  transformOrigin={{ vertical: "top", horizontal: "right" }}
+                >
+                  <MenuItem
+                    onClick={() => handleMenuAction("View", list)}
+                    sx={{
+                      color: colors.grey[100],
+                      fontWeight: 500,
+                      "&:hover": {
+                        backgroundColor: colors.blueAccent[700],
+                        color: "#fff",
+                      },
+                    }}
                   >
-                    <MenuItem
-                      onClick={() => handleMenuAction("View", list)}
-                      sx={{
-                        color: colors.grey[100],
-                        fontWeight: 500,
-                        "&:hover": {
-                          backgroundColor: colors.blueAccent[700],
-                          color: "#fff",
-                        },
-                      }}
-                    >
-                      View
-                    </MenuItem>
+                    View
+                  </MenuItem>
 
-                    <MenuItem
-                      onClick={() => handleMenuAction("Accept", list)}
-                      sx={{
-                        color: colors.greenAccent[500],
-                        fontWeight: 500,
-                        "&:hover": {
-                          backgroundColor: colors.greenAccent[500],
-                          color: "#fff",
-                        },
-                      }}
-                    >
-                      Accept
-                    </MenuItem>
+                  <MenuItem
+                    onClick={() => handleMenuAction("Accept", list)}
+                    sx={{
+                      color: colors.greenAccent[500],
+                      fontWeight: 500,
+                      "&:hover": {
+                        backgroundColor: colors.greenAccent[500],
+                        color: "#fff",
+                      },
+                    }}
+                  >
+                    Accept
+                  </MenuItem>
 
-                    <MenuItem
-                      onClick={() => handleMenuAction("Decline", list)}
-                      sx={{
-                        color: "#f44336", // red
-                        fontWeight: 500,
-                        "&:hover": {
-                          backgroundColor: "#f44336",
-                          color: "#fff",
-                        },
-                      }}
-                    >
-                      Decline
-                    </MenuItem>
-                  </Menu>
+                  <MenuItem
+                    onClick={() => handleMenuAction("Decline", list)}
+                    sx={{
+                      color: "#f44336", // red
+                      fontWeight: 500,
+                      "&:hover": {
+                        backgroundColor: "#f44336",
+                        color: "#fff",
+                      },
+                    }}
+                  >
+                    Decline
+                  </MenuItem>
+                </Menu>
                 )}
               </Box>
             ))}

@@ -1,6 +1,8 @@
+import React, { useState, useEffect } from "react";
 import { Box } from "@mui/material";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthContextProvider, useAuth } from "./context/authContext";
+import ScrollToTop from "./components/ScrollToTop";
 import Login from "./scenes/login";
 import Dashboard from "./scenes/dashboard";
 import SocialEnterprise from "./scenes/socialenterprise";
@@ -12,21 +14,24 @@ import Reports from "./scenes/reports";
 import Scheduling from "./scenes/scheduling";
 import EvaluatePage from "./scenes/assess";
 import SEAnalytics from "./scenes/seanalytics";
+import MentorAnalytics from "./scenes/mentoranalytics";
 import Mentorships from "./scenes/mentorships";
+import Sidebar from "./scenes/global/Sidebar";
+import Topbar from "./scenes/global/Topbar";
 import AuditLogs from "./scenes/audit-logs";
 import Unauthorized from "./scenes/unauthorized";
 import ProfilePage from "./scenes/profile";
 import { ColorModeContext, useMode } from "./theme";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import CoordinatorSignup from "./scenes/coordinator-signup";
+import LSEEDSignup from "./scenes/lseed-signup";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import ForgotPassword from "./scenes/forgotpassword";
 import ResetPassword from "./scenes/resetpassword";
 import FinancialAnalytics from "./scenes/financial-analytics";
 import PublicLayout from "./layouts/PublicLayout";
 import AppLayout from "./layouts/AppLayout";
-import { CsrfProvider } from "./context/CsrfContext.js";
+import CollaborationDashboard from "./scenes/collaborationdashboard";
 
 const App = () => {
   const [theme, colorMode] = useMode();
@@ -34,16 +39,14 @@ const App = () => {
   return (
     <GoogleOAuthProvider clientId="1025918978584-niisk93pun37oujtrjdkpra1cn1b8esv.apps.googleusercontent.com">
       <AuthContextProvider>
-        <CsrfProvider>
-            <ColorModeContext.Provider value={colorMode}>
-              <ThemeProvider theme={theme}>
-                <CssBaseline />
-                <Box sx={{ display: "flex", minHeight: "100vh" }}>
-                  <MainContent />
-                </Box>
-              </ThemeProvider>
-            </ColorModeContext.Provider>
-          </CsrfProvider>
+        <ColorModeContext.Provider value={colorMode}>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Box sx={{ display: "flex", minHeight: "100vh" }}>
+              <MainContent />
+            </Box>
+          </ThemeProvider>
+        </ColorModeContext.Provider>
       </AuthContextProvider>
     </GoogleOAuthProvider>
   );
@@ -51,14 +54,14 @@ const App = () => {
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user } = useAuth();
-  
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
-  
+
   // Assuming user.roles is an array from the backend
   const userRoles = Array.isArray(user.roles) ? user.roles : user.roles.split(',').map(role => role.trim());
-  
+
 
   // Define roles that have full access to all protected routes
   const privilegedRoles = ["LSEED-Director"];
@@ -88,7 +91,7 @@ const MainContent = () => {
 
       {/* PUBLIC ROUTES WITHOUT SIDEBAR/TOPBAR */}
       <Route element={<PublicLayout />}>
-        <Route path="/coordinator-signup" element={<CoordinatorSignup />} />
+        <Route path="/lseed-signup" element={<LSEEDSignup />} />
         <Route
           path="/"
           element={
@@ -127,12 +130,13 @@ const MainContent = () => {
           <Route path="/financial-analytics" element={<FinancialAnalytics />} />
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={["LSEED-Director", "LSEED-Coordinator","Mentor"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["LSEED-Director", "LSEED-Coordinator", "Mentor"]} />}>
           <Route path="/assess" element={<EvaluatePage />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["Mentor"]} />}>
           <Route path="/mentorships" element={<Mentorships />} />
+          <Route path="/mentor-analytics/:id" element={<MentorAnalytics />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["Administrator", "LSEED-Director",]} />}>
@@ -146,6 +150,10 @@ const MainContent = () => {
 
         <Route element={<ProtectedRoute allowedRoles={["LSEED-Coordinator", "Mentor", "Guest User", "LSEED-Director"]} />}>
           <Route path="/se-analytics/:id" element={<SEAnalytics />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={["Mentor"]} />}>
+          <Route path="/collaboration-dashboard" element={<CollaborationDashboard />} />
         </Route>
 
         <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} />} />

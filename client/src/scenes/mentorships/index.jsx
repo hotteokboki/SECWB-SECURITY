@@ -26,7 +26,6 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { useNavigate } from "react-router-dom"; // For navigation
 import { Snackbar, Alert } from "@mui/material";
 import { JsonRequestError } from "@fullcalendar/core/index.js";
-import axiosClient from "../../api/axiosClient.js"
 
 const Mentorships = () => {
   const theme = useTheme();
@@ -74,7 +73,9 @@ const Mentorships = () => {
   useEffect(() => {
     const fetchAvailability = async () => {
       try {
-        const response = await axiosClient.get(`/api/get-mentor-availability`);
+        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/get-mentor-availability`, {
+          withCredentials: true, // If session/cookie-based auth
+        });
         setIsAvailable(response.data.isAvailable);
       } catch (err) {
         console.error("Failed to fetch availability", err);
@@ -88,9 +89,11 @@ const Mentorships = () => {
     try {
       const newValue = !isAvailable;
       setIsLoadingToggle(true);
-      await axiosClient.post(`/api/toggle-mentor-availability`,{ 
-        isAvailable: newValue 
-      });
+      await axios.post(
+        `${process.env.REACT_APP_API_BASE_URL}/toggle-mentor-availability`,
+        { isAvailable: newValue },
+        { withCredentials: true } // ✅ ensure cookie is sent
+      );
       setIsAvailable(newValue);
     } catch (err) {
       console.error("Failed to update availability", err);
@@ -101,26 +104,26 @@ const Mentorships = () => {
 
   const handleGenerateOTP = async () => {
     try {
-      const response = await axiosClient.post(
-        `${process.env.REACT_APP_API_BASE_URL}/show-signup-password`,
-        {}, 
-        {
-          withCredentials: true, 
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/show-signup-password`, {
+        method: "POST",
+        credentials: "include",  // if you need session
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-      const data = response.data;
+      if (!response.ok) {
+        throw new Error("Failed to generate OTP");
+      }
+
+      const data = await response.json();
       setGeneratedOTP(data.otp);
       setOtpDialogOpen(true);
     } catch (error) {
       console.error("Error generating OTP:", error);
-        alert("Failed to generate OTP. Please try again.");
+      alert("Failed to generate OTP. Please try again.");
     }
   };
-
 
   // Fetch social enterprises from the backend
   useEffect(() => {
@@ -128,7 +131,7 @@ const Mentorships = () => {
       try {
         const mentor_id = userSession.id; // Replace with actual mentor ID
 
-        const response = await axiosClient.get(
+        const response = await axios.get(
           `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterpriseswithMentorID`,
           { params: { mentor_id } } // Pass mentor_id as a query parameter
         );

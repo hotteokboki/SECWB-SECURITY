@@ -4,44 +4,64 @@ import {
   Button,
   Typography,
   useTheme,
-  Select,
-  MenuItem,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField,
+  DialogActions,
 } from "@mui/material";
-import axios from "axios";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import { DataGrid } from "@mui/x-data-grid";
-import { Snackbar, Alert, Dialog, DialogTitle, DialogContent, TextField, DialogActions } from "@mui/material";
+import { useAuth } from "../../context/authContext";
 import axiosClient from "../../api/axiosClient";
 
 const AdminPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isEditing, setIsEditing] = useState(false); // Toggle editing mode
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const [isSuccessEditPopupOpen, setIsSuccessEditPopupOpen] = useState(false);
-  const [showEditButtons, setShowEditButtons] = useState(false);
   const [inviteCoordinatorFormData, setInviteCoordinatorFormData] = useState({
-      email: "",
+    email: "",
   });
+  const { user, isMentorView } = useAuth();
   const [emailError, setEmailError] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
-  const [selectedUser, setSelectedUser] = useState(null); // Track selected user
   const [openInviteCoordinator, setOpenInviteCoordinator] = useState(false);
   const handleOpenInviteCoordinator = () => setOpenInviteCoordinator(true);
   const handleCloseInviteCoordinator = () => setOpenInviteCoordinator(false);
 
+  const activeRole = (() => {
+    if (!user || !user.roles) return null;
+
+    const hasLSEED = user.roles.some((role) => role.startsWith("LSEED"));
+    const hasMentor = user.roles.includes("Mentor");
+
+    if (hasLSEED && hasMentor) {
+      return isMentorView ? "Mentor" : "LSEED-Coordinator";
+    } else if (hasMentor) {
+      return "Mentor";
+    } else if (hasLSEED) {
+      return user.roles.find((r) => r.startsWith("LSEED")); // either LSEED-Coordinator or LSEED-Director
+    } else if (user.roles.includes("Administrator")) {
+      return "Administrator";
+    }
+    return null;
+  })();
+
+  // TODO: Check the query of this
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
         const response = await axiosClient.get(`/api/admin/users`);
-        
-        setUsers(response.data);
+        const data = await response.data;
+        setUsers(data);
       } catch (err) {
         setError(err.message || "An error occurred while fetching users.");
       } finally {
@@ -76,15 +96,16 @@ const AdminPage = () => {
 
   const handleInviteCoordinatorSubmit = async () => {
     try {
-      // Basic validation - empty
-      if (!inviteCoordinatorFormData.email || !inviteCoordinatorFormData.email.trim()) {
+      if (
+        !inviteCoordinatorFormData.email ||
+        !inviteCoordinatorFormData.email.trim()
+      ) {
         setSnackbarMessage("Please input email");
         setSnackbarSeverity("error");
         setSnackbarOpen(true);
         return;
       }
 
-      // Email format validation
       if (!validateEmail(inviteCoordinatorFormData.email.trim())) {
         setSnackbarMessage("Please enter a valid email address");
         setSnackbarSeverity("error");
@@ -92,14 +113,11 @@ const AdminPage = () => {
         return;
       }
 
-        // Send the invite request
-        const response = await axiosClient.post(`/api/invite-coordinator`,{
-          email: inviteCoordinatorFormData.email.trim()
-        }, 
-      );
+      const response = await axiosClient.post(`/api/invite-lseed-user`, {
+        email: inviteCoordinatorFormData.email.trim(),
+      });
 
       if (response.status === 201) {
-        console.log("Coordinator invited successfully: ", response.data);
         setSnackbarMessage("Invite sent successfully");
         setSnackbarSeverity("success");
         setSnackbarOpen(true);
@@ -122,13 +140,12 @@ const AdminPage = () => {
   const handleInviteCoordinatorInputChange = (e) => {
     const { value } = e.target;
 
-    setInviteCoordinatorFormData(prev => ({
+    setInviteCoordinatorFormData((prev) => ({
       ...prev,
-      email: value
+      email: value,
     }));
 
     if (value === "") {
-      // If field is empty, clear error
       setEmailError("");
     } else if (!validateEmail(value)) {
       setEmailError("Please enter a valid email address");
@@ -137,41 +154,36 @@ const AdminPage = () => {
     }
   };
 
-  // Define DataGrid columns
+  // Read-only columns (no editing)
   const columns = [
     {
       field: "first_name",
       headerName: "First Name",
       flex: 1,
       renderCell: (params) => `${params.row.first_name}`,
-      editable: isEditing, // Make editable when in edit mode
+      editable: false,
     },
     {
       field: "last_name",
       headerName: "Last Name",
       flex: 1,
       renderCell: (params) => `${params.row.last_name}`,
-      editable: isEditing, // Make editable when in edit mode
+      editable: false,
     },
     {
       field: "email",
       headerName: "Email",
       flex: 1,
-      editable: isEditing, // Make editable when in edit mode
+      editable: false,
     },
     {
       field: "roles",
       headerName: "Roles",
       flex: 1.5,
-      // Render roles as a comma-separated string or badges
       renderCell: (params) => (
         <Box>
           {params.value && params.value.length > 0 ? (
-            params.value.join(", ") // Display as "Admin, LSEED-Coordinator"
-            // Or if you want badges:
-            // params.value.map((role, index) => (
-            //   <Chip key={index} label={role} size="small" style={{ margin: '2px' }} />
-            // ))
+            params.value.join(", ")
           ) : (
             <Typography variant="body2" color="textSecondary">
               No Roles
@@ -179,7 +191,7 @@ const AdminPage = () => {
           )}
         </Box>
       ),
-      editable: false, // You'll likely use a separate dialog for role editing
+      editable: false,
     },
     {
       field: "isactive",
@@ -196,72 +208,13 @@ const AdminPage = () => {
           {params.value ? "Active" : "Inactive"}
         </span>
       ),
-      renderEditCell: (params) => (
-        <Select
-          value={params.value ? "Active" : "Inactive"}
-          onChange={(e) =>
-            params.api.setEditCellValue({
-              id: params.id,
-              field: params.field,
-              value: e.target.value === "Active",
-            })
-          }
-          fullWidth
-        >
-          <MenuItem value="Active">Active</MenuItem>
-          <MenuItem value="Inactive">Inactive</MenuItem>
-        </Select>
-      ),
-      editable: isEditing, // Make editable when in edit mode
+      editable: false,
     },
   ];
 
-  const toggleEditing = () => {
-    if (!selectedUser || selectedUser.isactive) {
-      setIsEditing(true);
-      setShowEditButtons(true);
-    } else {
-      setSnackbarMessage("Account needs to be activated first.");
-      setSnackbarOpen(true);
-    }
-  };
-
-  // Close Snackbar Function
+  // Close Snackbar
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
-  };
-
-  // Handle row updates
-  const handleRowUpdate = async (updatedRow, oldRow) => {
-    console.log("Updating user:", updatedRow);
-
-    try {
-
-      const response = await axiosClient.put(
-        `${process.env.REACT_APP_API_BASE_URL}/api/admin/users/${updatedRow.user_id}`,
-        updatedRow // ✅ This will be JSON-stringified automatically by Axios
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to update user: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const { user: updatedUser } = await response.json();
-      console.log("User updated successfully:", updatedUser);
-
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.user_id === updatedUser.user_id ? updatedUser : user
-        )
-      );
-
-      return updatedUser; // Ensure the DataGrid updates immediately
-    } catch (error) {
-      console.error("Error updating user:", error);
-      // return oldRow; // ❌ Revert changes if the update fails
-    }
   };
 
   return (
@@ -272,66 +225,7 @@ const AdminPage = () => {
       </Box>
 
       <Box display="flex" alignItems="center" gap={2} mb={2}>
-        {/* Enable Editing Button */}
-        {!showEditButtons && (
-          <Button
-            variant="contained"
-            sx={{
-              backgroundColor: colors.blueAccent[500],
-              color: "black",
-              "&:hover": {
-                backgroundColor: colors.blueAccent[800],
-              },
-            }}
-            onClick={toggleEditing}
-          >
-            Enable Editing
-          </Button>
-        )}
-
-        {/* Cancel and Save Buttons */}
-        {showEditButtons && (
-          <>
-            <Button
-              variant="outlined"
-              sx={{
-                backgroundColor: colors.redAccent[500],
-                color: "black",
-                "&:hover": {
-                  backgroundColor: colors.redAccent[600],
-                },
-              }}
-              onClick={() => {
-                setIsEditing(false);
-                setShowEditButtons(false);
-                setTimeout(() => window.location.reload(), 500);
-              }}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              variant="contained"
-              sx={{
-                backgroundColor: colors.blueAccent[500],
-                color: "black",
-                "&:hover": {
-                  backgroundColor: colors.blueAccent[600],
-                },
-              }}
-              onClick={() => {
-                setIsEditing(false);
-                setShowEditButtons(false);
-                setIsSuccessEditPopupOpen(true);
-                setTimeout(() => window.location.reload(), 500);
-              }}
-            >
-              Save Changes
-            </Button>
-          </>
-        )}
-
-        {/* Create LSEED-Coordinator Button */}
+        {/* Create LSEED-Coordinator/Director Button */}
         <Button
           variant="contained"
           sx={{
@@ -341,9 +235,13 @@ const AdminPage = () => {
               backgroundColor: colors.greenAccent[600],
             },
           }}
-          onClick={handleOpenInviteCoordinator} 
+          onClick={handleOpenInviteCoordinator}
         >
-          Create LSEED-Coordinator
+          {activeRole === "LSEED-Director"
+            ? "Create LSEED-Coordinator"
+            : activeRole === "Administrator"
+            ? "Create LSEED-Director"
+            : "Create User"}
         </Button>
       </Box>
 
@@ -354,45 +252,38 @@ const AdminPage = () => {
         fullWidth
         PaperProps={{
           style: {
-            backgroundColor: "#fff", // White background
-            color: "#000", // Black text
-            border: "1px solid #000", // Black border for contrast
-            borderRadius: "4px", // Rounded corners for the dialog
+            backgroundColor: "#fff",
+            color: "#000",
+            border: "1px solid #000",
+            borderRadius: "4px",
           },
         }}
       >
-        {/* Dialog Title */}
         <DialogTitle
           sx={{
-            backgroundColor: "#1E4D2B", // DLSU Green header
-            color: "#fff", // White text
+            backgroundColor: "#1E4D2B",
+            color: "#fff",
             textAlign: "center",
             fontSize: "1.5rem",
             fontWeight: "bold",
-            borderBottom: "1px solid #000", // Separator line below the title
+            borderBottom: "1px solid #000",
           }}
         >
           Invite Coordinator
         </DialogTitle>
 
-        {/* Dialog Content */}
         <DialogContent
           sx={{
             padding: "24px",
-            maxHeight: "70vh", // Ensure it doesn't overflow the screen
-            overflowY: "auto", // Enable scrolling if content is too long
+            maxHeight: "70vh",
+            overflowY: "auto",
           }}
         >
-          {/* Input Fields */}
           <Box display="flex" flexDirection="column" gap={2}>
-            {/* Email Field */}
             <Box>
               <Typography
                 variant="subtitle1"
-                sx={{
-                  fontWeight: "bold",
-                  marginBottom: "8px", // Space between label and input
-                }}
+                sx={{ fontWeight: "bold", marginBottom: "8px" }}
               >
                 Email
               </Typography>
@@ -407,17 +298,17 @@ const AdminPage = () => {
                 onChange={handleInviteCoordinatorInputChange}
                 sx={{
                   "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#000", // Consistent border color
-                    borderWidth: "1px", // Solid 1px border
+                    borderColor: "#000",
+                    borderWidth: "1px",
                   },
                   "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#000", // Darken border on hover
+                    borderColor: "#000",
                   },
                   "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#000", // Consistent border color when focused
+                    borderColor: "#000",
                   },
                   "& .MuiInputBase-input": {
-                    color: "#000", // Set text color to black
+                    color: "#000",
                   },
                 }}
                 error={Boolean(emailError)}
@@ -427,50 +318,43 @@ const AdminPage = () => {
           </Box>
         </DialogContent>
 
-        {/* Dialog Actions */}
         <DialogActions
           sx={{
             padding: "16px",
-            borderTop: "1px solid #000", // Separator line above the actions
+            borderTop: "1px solid #000",
           }}
         >
-          {/* Cancel Button */}
           <Button
             onClick={() => {
-              handleCloseInviteCoordinator(); // ✅ Closes after timeout
+              handleCloseInviteCoordinator();
               setTimeout(() => {
                 window.location.reload();
-              }, 500); // Adjust delay if needed
+              }, 500);
             }}
             sx={{
               color: "#000",
               border: "1px solid #000",
-              borderRadius: "4px", // Rounded corners
-              "&:hover": {
-                backgroundColor: "#f0f0f0", // Hover effect
-              },
+              borderRadius: "4px",
+              "&:hover": { backgroundColor: "#f0f0f0" },
             }}
           >
             Cancel
           </Button>
 
-          {/* Add Button */}
           <Button
             onClick={handleInviteCoordinatorSubmit}
             variant="contained"
-            disabled={!inviteCoordinatorFormData.email} 
+            disabled={!inviteCoordinatorFormData.email}
             sx={{
-              backgroundColor:
-                inviteCoordinatorFormData.email
-                  ? "#1E4D2B"
-                  : "#A0A0A0", // Gray if disabled
+              backgroundColor: inviteCoordinatorFormData.email
+                ? "#1E4D2B"
+                : "#A0A0A0",
               color: "#fff",
-              borderRadius: "4px", // Rounded corners
+              borderRadius: "4px",
               "&:hover": {
-                backgroundColor:
-                  inviteCoordinatorFormData.email
-                    ? "#145A32"
-                    : "#A0A0A0", // Keep gray on hover when disabled
+                backgroundColor: inviteCoordinatorFormData.email
+                  ? "#145A32"
+                  : "#A0A0A0",
               },
             }}
           >
@@ -478,21 +362,6 @@ const AdminPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={isSuccessEditPopupOpen}
-        autoHideDuration={3000} // Automatically close after 3 seconds
-        onClose={() => setIsSuccessEditPopupOpen(false)} // Close on click or timeout
-        anchorOrigin={{ vertical: "top", horizontal: "center" }} // Position of the popup
-      >
-        <Alert
-          onClose={() => setIsSuccessEditPopupOpen(false)}
-          severity="success"
-          sx={{ width: "100%" }}
-        >
-          Successfully saved!
-        </Alert>
-      </Snackbar>
 
       {/* Manage Users */}
       <Box width="100%" backgroundColor={colors.primary[400]} padding="20px">
@@ -527,20 +396,15 @@ const AdminPage = () => {
           <DataGrid
             rows={users.map((user) => ({
               ...user,
-              id: user.user_id, // Ensure `id` is assigned properly
+              id: user.user_id,
             }))}
             columns={columns}
             pageSize={5}
             rowsPerPageOptions={[5, 10]}
-            getRowId={(row) => row.user_id} // Use `user_id` as row ID
-            processRowUpdate={handleRowUpdate}
-            onProcessRowUpdateError={(error) =>
-              console.error("Update failed:", error)
-            }
-            onRowClick={(params) => setSelectedUser(params.row)}
+            getRowId={(row) => row.user_id}
+            // Read-only: no editing handlers, no processRowUpdate
           />
 
-          {/* Snackbar for error messages */}
           <Snackbar
             open={snackbarOpen}
             autoHideDuration={3000}

@@ -45,6 +45,55 @@ exports.getMentorshipsByMentorId = async (mentor_id) => {
     }
 };
 
+exports.getCollaborators = async (mentor_id) => {
+  try {
+    const query = `
+      SELECT 
+        mt.mentorship_id,
+        m.mentor_firstname || ' ' || m.mentor_lastname AS mentor_name,
+        se.team_name AS social_enterprise_name,
+        se.se_id,
+        m.mentor_id,
+        p."name" AS program_name,
+        STRING_AGG(sdg."name", ', ') AS SDGs
+      FROM mentorships AS mt
+      JOIN mentors AS m ON mt.mentor_id = m.mentor_id
+      JOIN socialenterprises AS se ON mt.se_id = se.se_id
+      JOIN programs AS p ON se.program_id = p.program_id
+      JOIN sdg AS sdg ON sdg.sdg_id = ANY(se.sdg_id)
+
+      -- Exclude mentorships that are already involved in a collaboration
+      LEFT JOIN mentorship_collaborations mc1 
+        ON mc1.seeking_collaboration_mentorship_id = mt.mentorship_id
+      LEFT JOIN mentorship_collaborations mc2 
+        ON mc2.suggested_collaborator_mentorship_id = mt.mentorship_id
+
+      WHERE mt.mentor_id = $1
+        AND mc1.seeking_collaboration_mentorship_id IS NULL
+        AND mc2.suggested_collaborator_mentorship_id IS NULL
+
+      GROUP BY 
+        mt.mentorship_id,
+        m.mentor_firstname, 
+        m.mentor_lastname, 
+        se.team_name, 
+        se.se_id,
+        m.mentor_id,
+        p."name"
+
+      ORDER BY se.team_name;
+    `;
+
+    const values = [mentor_id];
+    const result = await pgDatabase.query(query, values);
+
+    return result.rows.length ? result.rows : [];
+  } catch (error) {
+    console.error("❌ Error fetching mentorships (excluding current mentor):", error);
+    return [];
+  }
+};
+
 exports.getMentorshipsForScheduling = async (mentor_id) => {
     try {
         const query = `
@@ -91,32 +140,34 @@ exports.getMentorshipsForScheduling = async (mentor_id) => {
 };
 
 exports.getMentorBySEID = async (se_id) => {
-    try {
-        const query = `
+  try {
+    const query = `
           SELECT 
             m.mentor_id, 
             m.mentor_firstname, 
-            m.mentor_lastname 
+            m.mentor_lastname,
+            ms.mentorship_id
           FROM mentorships AS ms 
           JOIN mentors AS m ON ms.mentor_id = m.mentor_id 
           WHERE ms.se_id = $1
           LIMIT 1;  -- ✅ Ensure only one mentor is returned
         `;
 
-        const values = [se_id];
-        const result = await pgDatabase.query(query, values);
+    const values = [se_id];
+    const result = await pgDatabase.query(query, values);
 
-        // ✅ Return a single object instead of an array
-        return result.rows.length > 0 
-            ? {
-                  name: `${result.rows[0].mentor_firstname} ${result.rows[0].mentor_lastname}`, 
-                  mentor_id: result.rows[0].mentor_id
-              }
-            : null; // Return null if no mentor is found
-    } catch (error) {
-        console.error("❌ Error fetching mentorship by SE_ID:", error);
-        return null; // Return null in case of an error
-    }
+    // ✅ Return a single object instead of an array
+    return result.rows.length > 0
+      ? {
+        name: `${result.rows[0].mentor_firstname} ${result.rows[0].mentor_lastname}`,
+        mentor_id: result.rows[0].mentor_id,
+        mentorship_id: result.rows[0].mentorship_id
+      }
+      : null; // Return null if no mentor is found
+  } catch (error) {
+    console.error("❌ Error fetching mentorship by SE_ID:", error);
+    return null; // Return null in case of an error
+  }
 };
 
 exports.getSEWithMentors = async (program = null) => {
@@ -409,6 +460,288 @@ exports.getProgramCoordinatorsByMentorshipID = async (mentorship_id) => {
     return result.rows;
   } catch (error) {
     console.error("❌ Error fetching program coordinators by mentorship ID:", error);
+    return [];
+  }
+};
+
+exports.getSuggestedCollaborations = async (mentor_id, mentorship_id) => {
+  try {
+    const query = `
+      WITH mentorship_traits AS (
+        SELECT 
+          m.mentorship_id,
+          m.mentor_id,
+          ec.category_name,
+          ROUND(AVG(ec.rating), 2) AS avg_rating
+        FROM mentorships m
+        JOIN evaluations e ON e.se_id = m.se_id
+        JOIN evaluation_categories ec ON ec.evaluation_id = e.evaluation_id
+        GROUP BY m.mentorship_id, m.mentor_id, ec.category_name
+      ),
+
+      strengths AS (
+        SELECT mentorship_id, category_name FROM mentorship_traits WHERE avg_rating > 3
+      ),
+
+      weaknesses AS (
+        SELECT mentorship_id, category_name FROM mentorship_traits WHERE avg_rating <= 3
+      ),
+
+      complementary_matches AS (
+        SELECT 
+          a.mentorship_id AS mentorship_a,
+          b.mentorship_id AS mentorship_b,
+          COUNT(*) AS match_count,
+          ARRAY_AGG(a.category_name ORDER BY a.category_name) AS matched_categories,
+          1 AS priority
+        FROM weaknesses a
+        JOIN strengths b ON a.category_name = b.category_name AND a.mentorship_id <> b.mentorship_id
+        GROUP BY a.mentorship_id, b.mentorship_id
+        HAVING COUNT(*) >= 3
+      ),
+
+      shared_strengths AS (
+        SELECT 
+          a.mentorship_id AS mentorship_a,
+          b.mentorship_id AS mentorship_b,
+          COUNT(*) AS match_count,
+          ARRAY_AGG(a.category_name ORDER BY a.category_name) AS matched_categories,
+          2 AS priority
+        FROM strengths a
+        JOIN strengths b ON a.category_name = b.category_name AND a.mentorship_id <> b.mentorship_id
+        GROUP BY a.mentorship_id, b.mentorship_id
+        HAVING COUNT(*) >= 3
+      ),
+
+      shared_weaknesses AS (
+        SELECT 
+          a.mentorship_id AS mentorship_a,
+          b.mentorship_id AS mentorship_b,
+          COUNT(*) AS match_count,
+          ARRAY_AGG(a.category_name ORDER BY a.category_name) AS matched_categories,
+          3 AS priority
+        FROM weaknesses a
+        JOIN weaknesses b ON a.category_name = b.category_name AND a.mentorship_id <> b.mentorship_id
+        GROUP BY a.mentorship_id, b.mentorship_id
+        HAVING COUNT(*) >= 3
+      ),
+
+      all_matches AS (
+        SELECT * FROM complementary_matches
+        UNION ALL
+        SELECT * FROM shared_strengths
+        UNION ALL
+        SELECT * FROM shared_weaknesses
+      ),
+
+      ranked_recommendations AS (
+        SELECT 
+          am.priority,
+          ma.mentorship_id,
+          ma.mentor_id,
+          ma.se_id AS seeking_collaboration_se_id,
+          mna.mentor_firstname || ' ' || mna.mentor_lastname AS seeking_collaboration_mentor_name,
+          se_a.team_name AS seeking_collaboration_se_name,
+          se_a.abbr AS seeking_collaboration_se_abbreviation,
+
+          mb.mentorship_id AS suggested_collaborator_mentorship_id,
+          mb.mentor_id AS suggested_collaboration_mentor_id,
+          mb.se_id AS suggested_collaboration_se_id,
+          mnb.mentor_firstname || ' ' || mnb.mentor_lastname AS suggested_collaboration_mentor_name,
+          se_b.team_name AS suggested_collaboration_se_name,
+          se_b.abbr AS suggested_collaboration_se_abbreviation,
+
+          am.match_count,
+          am.matched_categories,
+          ROW_NUMBER() OVER (
+            PARTITION BY ma.mentorship_id, am.priority
+            ORDER BY am.match_count DESC, mnb.mentor_firstname
+          ) AS row_num
+        FROM all_matches am
+        JOIN mentorships ma ON ma.mentorship_id = am.mentorship_a
+        JOIN mentors mna ON mna.mentor_id = ma.mentor_id
+        JOIN socialenterprises se_a ON se_a.se_id = ma.se_id
+        JOIN mentorships mb ON mb.mentorship_id = am.mentorship_b
+        JOIN mentors mnb ON mnb.mentor_id = mb.mentor_id
+        JOIN socialenterprises se_b ON se_b.se_id = mb.se_id
+        WHERE ma.mentorship_id = $2
+          AND ma.mentor_id = $1
+          AND mb.mentor_id <> ma.mentor_id
+          AND NOT EXISTS (
+            SELECT 1 FROM mentorship_collaborations mc
+            WHERE (mc.seeking_collaboration_mentorship_id = am.mentorship_a AND mc.suggested_collaborator_mentorship_id = am.mentorship_b)
+              OR (mc.seeking_collaboration_mentorship_id = am.mentorship_b AND mc.suggested_collaborator_mentorship_id = am.mentorship_a)
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM mentorship_collaboration_requests req
+            WHERE req.collaboration_card_id = CAST(mb.se_id AS text) || '_' || CAST(ma.se_id AS text)
+          )
+          -- ✅ NEW: Prevent suggestion if a request already exists for same seeking SE + tier
+          AND NOT EXISTS (
+            SELECT 1 FROM mentorship_collaboration_requests req
+            WHERE SPLIT_PART(req.collaboration_card_id, '_', 2)::UUID = ma.se_id
+              AND req.tier = am.priority
+          )
+      ),
+
+      fallback_options AS (
+        SELECT 
+          m.mentorship_id AS suggested_collaborator_mentorship_id,
+          m.mentor_id AS suggested_collaboration_mentor_id,
+          m.se_id AS suggested_collaboration_se_id,
+          mentors.mentor_firstname || ' ' || mentors.mentor_lastname AS suggested_collaboration_mentor_name,
+          se_b.team_name AS suggested_collaboration_se_name,
+          se_b.abbr AS suggested_collaboration_se_abbreviation,
+          4 AS priority,
+
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM weaknesses w1
+              JOIN strengths s1 ON w1.category_name = s1.category_name
+              WHERE w1.mentorship_id = $2 AND s1.mentorship_id = m.mentorship_id
+            ) THEN 1
+            WHEN EXISTS (
+              SELECT 1 FROM strengths s2
+              JOIN strengths s3 ON s2.category_name = s3.category_name
+              WHERE s2.mentorship_id = $2 AND s3.mentorship_id = m.mentorship_id
+            ) THEN 2
+            WHEN EXISTS (
+              SELECT 1 FROM weaknesses w2
+              JOIN weaknesses w3 ON w2.category_name = w3.category_name
+              WHERE w2.mentorship_id = $2 AND w3.mentorship_id = m.mentorship_id
+            ) THEN 3
+            ELSE NULL
+          END AS subtier
+        FROM mentorships m
+        JOIN mentors ON mentors.mentor_id = m.mentor_id
+        JOIN socialenterprises se_b ON se_b.se_id = m.se_id
+        WHERE m.mentorship_id <> $2
+          AND m.mentor_id <> $1
+          AND m.mentorship_id NOT IN (
+            SELECT suggested_collaborator_mentorship_id FROM mentorship_collaborations WHERE seeking_collaboration_mentorship_id = $2
+            UNION
+            SELECT seeking_collaboration_mentorship_id FROM mentorship_collaborations WHERE suggested_collaborator_mentorship_id = $2
+          )
+          AND CAST(m.se_id AS TEXT) || '_' || (
+            SELECT CAST(se_id AS TEXT) FROM mentorships WHERE mentorship_id = $2
+          ) NOT IN (
+            SELECT collaboration_card_id FROM mentorship_collaboration_requests
+          )
+          AND m.mentorship_id NOT IN (
+            SELECT suggested_collaborator_mentorship_id FROM ranked_recommendations WHERE row_num = 1
+          )
+      )
+
+      -- Final output
+      SELECT 
+        rr.priority AS tier,
+        NULL AS subtier,
+        rr.seeking_collaboration_mentor_name,
+        rr.seeking_collaboration_se_name,
+        rr.seeking_collaboration_se_abbreviation,
+        rr.seeking_collaboration_se_id,
+        rr.suggested_collaboration_mentor_name,
+        rr.suggested_collaboration_mentor_id,
+        rr.suggested_collaboration_se_name,
+        rr.suggested_collaboration_se_abbreviation,
+        rr.suggested_collaboration_se_id,
+        rr.matched_categories,
+
+        sa.strengths AS seeking_collaboration_se_strengths,
+        wa.weaknesses AS seeking_collaboration_se_weaknesses,
+        sb.strengths AS suggested_collaboration_se_strengths,
+        wb.weaknesses AS suggested_collaboration_se_weaknesses,
+
+        NOW() AS created_at
+      FROM ranked_recommendations rr
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS strengths
+        FROM mentorship_traits WHERE mentorship_id = rr.mentorship_id AND avg_rating > 3
+      ) sa ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS weaknesses
+        FROM mentorship_traits WHERE mentorship_id = rr.mentorship_id AND avg_rating <= 3
+      ) wa ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS strengths
+        FROM mentorship_traits WHERE mentorship_id = rr.suggested_collaborator_mentorship_id AND avg_rating > 3
+      ) sb ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS weaknesses
+        FROM mentorship_traits WHERE mentorship_id = rr.suggested_collaborator_mentorship_id AND avg_rating <= 3
+      ) wb ON true
+      WHERE rr.row_num = 1
+
+      UNION ALL
+
+      SELECT 
+        f.priority,
+        f.subtier,
+        mna.mentor_firstname || ' ' || mna.mentor_lastname,
+        se_a.team_name,
+        se_a.abbr,
+        se_a.se_id,
+        f.suggested_collaboration_mentor_name,
+        f.suggested_collaboration_mentor_id,
+        f.suggested_collaboration_se_name,
+        f.suggested_collaboration_se_abbreviation,
+        f.suggested_collaboration_se_id,
+
+        CASE 
+          WHEN f.subtier = 1 THEN (
+            SELECT ARRAY_AGG(w1.category_name ORDER BY w1.category_name)
+            FROM weaknesses w1
+            JOIN strengths s1 ON w1.category_name = s1.category_name
+            WHERE w1.mentorship_id = ma.mentorship_id AND s1.mentorship_id = f.suggested_collaborator_mentorship_id
+          )
+          WHEN f.subtier = 2 THEN (
+            SELECT ARRAY_AGG(s2.category_name ORDER BY s2.category_name)
+            FROM strengths s2
+            JOIN strengths s3 ON s2.category_name = s3.category_name
+            WHERE s2.mentorship_id = ma.mentorship_id AND s3.mentorship_id = f.suggested_collaborator_mentorship_id
+          )
+          WHEN f.subtier = 3 THEN (
+            SELECT ARRAY_AGG(w2.category_name ORDER BY w2.category_name)
+            FROM weaknesses w2
+            JOIN weaknesses w3 ON w2.category_name = w3.category_name
+            WHERE w2.mentorship_id = ma.mentorship_id AND w3.mentorship_id = f.suggested_collaborator_mentorship_id
+          )
+          ELSE ARRAY[]::text[]
+        END AS matched_categories,
+
+        sa.strengths,
+        wa.weaknesses,
+        sb.strengths,
+        wb.weaknesses,
+
+        NOW()
+      FROM fallback_options f
+      JOIN mentorships ma ON ma.mentorship_id = $2
+      JOIN mentors mna ON mna.mentor_id = ma.mentor_id
+      JOIN socialenterprises se_a ON se_a.se_id = ma.se_id
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS strengths
+        FROM mentorship_traits WHERE mentorship_id = ma.mentorship_id AND avg_rating > 3
+      ) sa ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS weaknesses
+        FROM mentorship_traits WHERE mentorship_id = ma.mentorship_id AND avg_rating <= 3
+      ) wa ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS strengths
+        FROM mentorship_traits WHERE mentorship_id = f.suggested_collaborator_mentorship_id AND avg_rating > 3
+      ) sb ON true
+      LEFT JOIN LATERAL (
+        SELECT ARRAY_AGG(category_name ORDER BY category_name) AS weaknesses
+        FROM mentorship_traits WHERE mentorship_id = f.suggested_collaborator_mentorship_id AND avg_rating <= 3
+      ) wb ON true
+      ORDER BY tier, subtier NULLS LAST;
+    `;
+
+    const result = await pgDatabase.query(query, [mentor_id, mentorship_id]);
+    return result.rows;
+  } catch (error) {
+    console.error("❌ Error fetching suggested collaborations:", error);
     return [];
   }
 };

@@ -1,7 +1,6 @@
 import { ResponsiveBar } from "@nivo/bar";
 import { Box, Typography, useTheme } from "@mui/material";
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { tokens } from "../theme";
 import { useAuth } from "../context/authContext";
 import axiosClient from "../api/axiosClient";
@@ -20,11 +19,7 @@ const AcknowledgmentChart = ({}) => {
 
         if (isCoordinator) {
           const res = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              withCredentials: true,
-            }
-          );
+            `/api/get-program-coordinator`);
 
           const data = res.data;
           const program = data[0]?.name;

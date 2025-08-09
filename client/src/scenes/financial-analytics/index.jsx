@@ -1,4 +1,4 @@
-import { Box, useTheme, Typography } from "@mui/material";
+import { Box, useTheme, Typography, Button } from "@mui/material";
 import Header from "../../components/Header";
 import StatBox from "../../components/StatBox";
 import LineChart from "../../components/LineChart";
@@ -9,7 +9,6 @@ import POTLineChart from "../../components/ProfitOTLineChart.jsx";
 import PieChart from "../../components/PieChart";
 import { tokens } from "../../theme";
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { DataGrid } from "@mui/x-data-grid";
 import { FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import MoneyOffOutlinedIcon from "@mui/icons-material/MoneyOffOutlined";
@@ -18,41 +17,77 @@ import InventoryTurnoverBar from "../../components/InventoryTurnoverBarChart.jsx
 import { useAuth } from "../../context/authContext";
 import axiosClient from "../../api/axiosClient.js";
 
-const FinancialAnalytics = ({}) => {
+const FinancialAnalytics = ({ }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const [financialData, setFinancialData] = useState([]);
   const [cashFlowRaw, setCashFlowRaw] = useState([]);
   const { user } = useAuth();
-
-  // Connect to the DB
+  const [firstAverageProfit, setFirstAverageProfit] = useState(0);
+  const [firstAverageEquity, setFirstAverageEquity] = useState(0);
+  const [showTop5Mode, setShowTop5Mode] = useState(false);
+  const [showTop5ModeEquity, setShowTop5ModeEquity] = useState(false); // New state for equity chart
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [financialResponse, cashFlowResponse] = await Promise.all([
-          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`),
-          axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
+        const [financialResult, cashFlowResult] = await Promise.allSettled([
+          axiosClient.get('/api/financial-statements'),
+          axiosClient.get('/api/cashflow'),
         ]);
-        setFinancialData(financialResponse.data);
-        setCashFlowRaw(cashFlowResponse.data);
+
+        if (financialResult.status === 'fulfilled') {
+          setFinancialData(financialResult.value.data);
+        } else {
+          console.error('Failed to fetch financial statements:', financialResult.reason);
+          setFinancialData([]); // fallback to empty
+        }
+
+        if (cashFlowResult.status === 'fulfilled') {
+          setCashFlowRaw(cashFlowResult.value.data);
+        } else {
+          console.error('Failed to fetch cashflow:', cashFlowResult.reason);
+          setCashFlowRaw([]); // fallback to empty
+        }
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error('Unexpected error:', error);
       }
     };
 
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (financialData.length > 0) {
+      let totalProfitAllSEs = 0;
+      let totalEquityAllSEs = 0;
+      let totalDataPoints = 0;
+
+      financialData.forEach(item => {
+        const totalRevenue = Number(item.total_revenue ?? 0);
+        const totalExpenses = Number(item.total_expenses ?? 0);
+        const ownerEquity = Number(item.owner_equity ?? 0);
+
+        totalProfitAllSEs += (totalRevenue - totalExpenses);
+        totalEquityAllSEs += ownerEquity;
+        totalDataPoints++;
+      });
+
+      if (totalDataPoints > 0) {
+        setFirstAverageProfit(totalProfitAllSEs / totalDataPoints);
+        setFirstAverageEquity(totalEquityAllSEs / totalDataPoints);
+      }
+    }
+  }, [financialData]);
+
   const [inventoryData, setInventoryData] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`
+        const response = await axiosClient.get(
+          `/api/inventory-distribution`
         );
-        console.log("1. Raw Inventory Data Fetched from API:", response.data);
         setInventoryData(response.data);
       } catch (error) {
         console.error("Error fetching inventory data:", error);
@@ -60,9 +95,8 @@ const FinancialAnalytics = ({}) => {
     };
 
     fetchData();
-  }, []); // The empty dependency array ensures this runs once on component mount
+  }, []);
 
-  // Compute totals for inventory based on fetched data
   const inventoryBySE = {};
 
   inventoryData.forEach(({ se_abbr, qty, price, amount }) => {
@@ -75,7 +109,6 @@ const FinancialAnalytics = ({}) => {
     inventoryBySE[se_abbr].totalCOGS += amountNum;
   });
 
-  // Format data for charts (These should replace your existing mock data calculations)
   const inventoryValueData = Object.entries(inventoryBySE)
     .map(([se_id, data]) => ({
       id: se_id,
@@ -154,9 +187,9 @@ const FinancialAnalytics = ({}) => {
       : "0.00";
     se.grossProfitMargin = se.totalRevenue
       ? (
-          ((se.totalRevenue - se.totalExpenses) / se.totalRevenue) *
-          100
-        ).toFixed(2)
+        ((se.totalRevenue - se.totalExpenses) / se.totalRevenue) *
+        100
+      ).toFixed(2)
       : "0.00";
     se.debtToAssetRatio = se.totalAssets
       ? (dataPoint.totalLiabilities / dataPoint.totalAssets).toFixed(2)
@@ -169,46 +202,146 @@ const FinancialAnalytics = ({}) => {
   const socialEnterprises = Array.from(seMap.values());
 
   const profitOverTimeSeries = socialEnterprises.map((se) => {
-  const seenMonths = new Map();
+    const seenQuarters = new Map();
 
-  se.revenueVsExpenses.forEach((point) => {
-    if (!point || typeof point.x !== "string" || typeof point.revenue !== "number" || typeof point.expenses !== "number") return;
+    se.revenueVsExpenses.forEach((point) => {
+      if (!point || typeof point.x !== "string" || typeof point.revenue !== "number" || typeof point.expenses !== "number") return;
 
-    const date = new Date(point.x);
-    if (isNaN(date)) return;
-    const monthKey = date.toLocaleString("default", { month: "long" }); 
-    const year = date.getFullYear();
-    const key = `${monthKey} ${year}`;
+      const date = new Date(point.x);
+      if (isNaN(date)) return;
 
-    const profit = point.revenue - point.expenses;
+      const month = date.getMonth(); // 0-11
+      const year = date.getFullYear();
+      let quarterKey = '';
+      let quarterNum = 0;
 
-    if (!seenMonths.has(key)) {
-      seenMonths.set(key, { totalProfit: profit, count: 1 });
-    } else {
-      const current = seenMonths.get(key);
-      seenMonths.set(key, {
-        totalProfit: current.totalProfit + profit,
-        count: current.count + 1,
-      });
-    }
-  });
+      if (month >= 0 && month <= 2) {
+        quarterKey = `Q1 ${year}`;
+        quarterNum = 1;
+      } else if (month >= 3 && month <= 5) {
+        quarterKey = `Q2 ${year}`;
+        quarterNum = 2;
+      } else if (month >= 6 && month <= 8) {
+        quarterKey = `Q3 ${year}`;
+        quarterNum = 3;
+      } else {
+        quarterKey = `Q4 ${year}`;
+        quarterNum = 4;
+      }
 
-  const averagedData = Array.from(seenMonths.entries())
-    .map(([month, { totalProfit, count }]) => ({
-      x: month,
-      y: Number((totalProfit / count).toFixed(2)),
-    }))
-    .sort((a, b) => {
-      const dateA = new Date(`1 ${a.x}`);
-      const dateB = new Date(`1 ${b.x}`);
-      return dateA - dateB;
+      const profit = point.revenue - point.expenses;
+
+      if (!seenQuarters.has(quarterKey)) {
+        seenQuarters.set(quarterKey, { totalProfit: profit, count: 1, year: year, quarterNum: quarterNum });
+      } else {
+        const current = seenQuarters.get(quarterKey);
+        seenQuarters.set(quarterKey, {
+          totalProfit: current.totalProfit + profit,
+          count: current.count + 1,
+          year: year,
+          quarterNum: quarterNum
+        });
+      }
     });
 
-  return {
-    id: se.name,
-    data: averagedData,
-  };
-});
+    const averagedData = Array.from(seenQuarters.entries())
+      .map(([key, { totalProfit, count, year, quarterNum }]) => {
+        const averageQuarterlyProfit = totalProfit / count;
+        let starRating = 0;
+
+        if (firstAverageProfit === 0) {
+          if (averageQuarterlyProfit < 0) {
+            starRating = 1;
+          } else if (averageQuarterlyProfit > 0) {
+            starRating = 3;
+          } else {
+            starRating = 0;
+          }
+        } else {
+          if (averageQuarterlyProfit < 0) {
+            starRating = 1;
+          } else if (averageQuarterlyProfit >= 0 && averageQuarterlyProfit < firstAverageProfit) {
+            starRating = 2;
+          } else if (averageQuarterlyProfit >= firstAverageProfit && averageQuarterlyProfit < 1.5 * firstAverageProfit) {
+            starRating = 3;
+          } else if (averageQuarterlyProfit >= 1.5 * firstAverageProfit && averageQuarterlyProfit < 2 * firstAverageProfit) {
+            starRating = 4;
+          } else if (averageQuarterlyProfit >= 2 * firstAverageProfit) {
+            starRating = 5;
+          }
+        }
+
+        starRating = Math.max(0, Math.min(5, Math.round(starRating)));
+
+        return {
+          x: `${year} Q${quarterNum}`,
+          y: starRating,
+          year: year,
+          quarterNum: quarterNum
+        };
+      })
+      .sort((a, b) => {
+        if (a.year !== b.year) {
+          return a.year - b.year;
+        }
+        return a.quarterNum - b.quarterNum;
+      });
+
+    // Calculate overall average raw profit for ranking
+    const overallAvgRawProfit = se.revenueVsExpenses.reduce((sum, point) => {
+      return sum + (Number(point.revenue ?? 0) - Number(point.expenses ?? 0));
+    }, 0) / se.revenueVsExpenses.length;
+
+
+    return {
+      id: se.name,
+      data: averagedData,
+      overallAvgRawProfit: overallAvgRawProfit,
+    };
+  });
+
+  const currentYear = new Date().getFullYear();
+
+  // Filter all data to include only quarters up to and including the current year
+  const allSocialEnterprisesDataFormatted = profitOverTimeSeries.map(series => {
+    return {
+      ...series,
+      data: series.data.filter(point => point.year <= currentYear)
+    };
+  });
+
+  // Calculate an overall profitability score for each social enterprise
+  const rankedSocialEnterprises = [...allSocialEnterprisesDataFormatted].sort((a, b) => {
+    return b.overallAvgRawProfit - a.overallAvgRawProfit;
+  });
+
+  // Select the top 5 social enterprises, showing their last 5 quarters
+  const top5SocialEnterprisesData = rankedSocialEnterprises.slice(0, 5).map(series => {
+    const sortedData = [...series.data].sort((a, b) => {
+      if (a.year !== b.year) {
+        return a.year - b.year;
+      }
+      return a.quarterNum - b.quarterNum;
+    });
+
+    return {
+      id: series.id,
+      data: sortedData.slice(-5)
+    };
+  });
+
+  // Determine which data to display based on showTop5Mode
+  let displayedProfitOverTimeSeries;
+  let chartTitle = "Profit Over Time (by Social Enterprise)";
+
+  if (showTop5Mode) {
+    displayedProfitOverTimeSeries = top5SocialEnterprisesData;
+    chartTitle = "Top 5 Social Enterprises by Profit Over Time (Last 5 Quarters)";
+  } else {
+    displayedProfitOverTimeSeries = allSocialEnterprisesDataFormatted;
+    chartTitle = "All Social Enterprises by Profit Over Time (Full History)";
+  }
+
 
   const highestExpenseSE = socialEnterprises.reduce(
     (max, se) => (se.totalExpenses > (max?.totalExpenses || 0) ? se : max),
@@ -222,16 +355,14 @@ const FinancialAnalytics = ({}) => {
   };
 
   const getExpenseLevelColor = (amount) => {
-    if (amount > 100000) return colors?.redAccent?.[400] ?? "#ff5252"; // red
-    if (amount > 50000) return colors?.yellowAccent?.[400] ?? "#EDED00"; // yellow
-    return colors?.greenAccent?.[400] ?? "#4caf50"; // green
+    if (amount > 100000) return colors?.redAccent?.[400] ?? "#ff5252";
+    if (amount > 50000) return colors?.yellowAccent?.[400] ?? "#EDED00";
+    return colors?.greenAccent?.[400] ?? "#4caf50";
   };
 
-  // Helper to calculate averages for StatBoxes (or sums where applicable)
   const avg = (arr, key) =>
     (arr.reduce((acc, item) => acc + item[key], 0) / arr.length).toFixed(2);
 
-  // Format revenue vs expenses as separate series per SE for line chart
   const revenueVsExpensesData = socialEnterprises
     .map((se) => ({
       id: `${se.name} Revenue`,
@@ -250,25 +381,147 @@ const FinancialAnalytics = ({}) => {
       }))
     );
 
-  // Format equity trend per SE for line chart
+  // Modified equityTrendData to use quarterly star ratings
   const equityTrendData = socialEnterprises.map((se) => {
-    const sortedEquity = [...se.equityTrend].sort((a, b) => {
-      const dateA = new Date(a.x);
-      const dateB = new Date(b.x);
-      return dateA - dateB;
+    const seenQuartersEquity = new Map();
+
+    se.equityTrend.forEach((point) => {
+      if (!point || typeof point.x !== "string" || typeof point.equity !== "number") return;
+
+      const date = new Date(point.x);
+      if (isNaN(date)) return;
+
+      const month = date.getMonth();
+      const year = date.getFullYear();
+      let quarterKey = '';
+      let quarterNum = 0;
+
+      if (month >= 0 && month <= 2) {
+        quarterKey = `Q1 ${year}`;
+        quarterNum = 1;
+      } else if (month >= 3 && month <= 5) {
+        quarterKey = `Q2 ${year}`;
+        quarterNum = 2;
+      } else if (month >= 6 && month <= 8) {
+        quarterKey = `Q3 ${year}`;
+        quarterNum = 3;
+      } else {
+        quarterKey = `Q4 ${year}`;
+        quarterNum = 4;
+      }
+
+      const equity = point.equity;
+
+      if (!seenQuartersEquity.has(quarterKey)) {
+        seenQuartersEquity.set(quarterKey, { totalEquity: equity, count: 1, year: year, quarterNum: quarterNum });
+      } else {
+        const current = seenQuartersEquity.get(quarterKey);
+        seenQuartersEquity.set(quarterKey, {
+          totalEquity: current.totalEquity + equity,
+          count: current.count + 1,
+          year: year,
+          quarterNum: quarterNum
+        });
+      }
     });
+
+    const averagedEquityData = Array.from(seenQuartersEquity.entries())
+      .map(([key, { totalEquity, count, year, quarterNum }]) => {
+        const averageQuarterlyEquity = totalEquity / count;
+        let starRating = 0;
+
+        // Star rating logic for equity
+        if (firstAverageEquity === 0) {
+          if (averageQuarterlyEquity < 0) {
+            starRating = 1;
+          } else if (averageQuarterlyEquity > 0) {
+            starRating = 3;
+          } else {
+            starRating = 0;
+          }
+        } else {
+          if (averageQuarterlyEquity < 0) {
+            starRating = 1;
+          } else if (averageQuarterlyEquity >= 0 && averageQuarterlyEquity < firstAverageEquity * 0.5) {
+            starRating = 2;
+          } else if (averageQuarterlyEquity >= firstAverageEquity * 0.5 && averageQuarterlyEquity < firstAverageEquity * 1.0) {
+            starRating = 3;
+          } else if (averageQuarterlyEquity >= firstAverageEquity * 1.0 && averageQuarterlyEquity < firstAverageEquity * 1.5) {
+            starRating = 4;
+          } else if (averageQuarterlyEquity >= firstAverageEquity * 1.5) {
+            starRating = 5;
+          }
+        }
+
+        starRating = Math.max(0, Math.min(5, Math.round(starRating)));
+
+        return {
+          x: `${year} Q${quarterNum}`,
+          y: starRating,
+          year: year,
+          quarterNum: quarterNum
+        };
+      })
+      .sort((a, b) => {
+        if (a.year !== b.year) {
+          return a.year - b.year;
+        }
+        return a.quarterNum - b.quarterNum;
+      });
+
+    // Calculate overall average raw equity for ranking
+    const overallAvgRawEquity = se.equityTrend.reduce((sum, point) => {
+      return sum + (Number(point.equity ?? 0));
+    }, 0) / se.equityTrend.length;
 
     return {
       id: se.name,
-      data: sortedEquity.map((point) => ({
-        x: point.x,
-        y: point.equity,
-      })),
+      data: averagedEquityData,
+      overallAvgRawEquity: overallAvgRawEquity, // Add this for ranking
     };
   });
 
-  // For cash flow bar chart, similar approach:
-  // Create two series: inflow and outflow per SE, combine as grouped bar chart
+  // Filter all equity data to include only quarters up to and including the current year
+  const allSocialEnterprisesEquityDataFormatted = equityTrendData.map(series => {
+    return {
+      ...series,
+      data: series.data.filter(point => point.year <= currentYear)
+    };
+  });
+
+  // Calculate an overall equity score for each social enterprise and rank them
+  const rankedSocialEnterprisesByEquity = [...allSocialEnterprisesEquityDataFormatted].sort((a, b) => {
+    return b.overallAvgRawEquity - a.overallAvgRawEquity;
+  });
+
+  // Select the top 5 social enterprises by equity, showing their last 5 quarters
+  const top5SocialEnterprisesEquityData = rankedSocialEnterprisesByEquity.slice(0, 5).map(series => {
+    const sortedData = [...series.data].sort((a, b) => {
+      if (a.year !== b.year) {
+        return a.year - b.year;
+      }
+      return a.quarterNum - b.quarterNum;
+    });
+
+    return {
+      id: series.id,
+      data: sortedData.slice(-5) // Last 5 quarters
+    };
+  });
+
+  // Determine which data to display based on showTop5ModeEquity
+  let displayedEquityOverTimeSeries;
+  let equityChartTitle = "Equity Star Rating Over Time (by Social Enterprise)";
+
+  if (showTop5ModeEquity) {
+    displayedEquityOverTimeSeries = top5SocialEnterprisesEquityData;
+    equityChartTitle = "Top 5 Social Enterprises by Equity Trend";
+  } else {
+    displayedEquityOverTimeSeries = allSocialEnterprisesEquityDataFormatted;
+    equityChartTitle = "Equity Trend by Social Enterprises";
+  }
+
+
   const cashFlowMap = new Map();
   const [selectedSE1, setSelectedSE1] = useState("");
   const [selectedSE2, setSelectedSE2] = useState("");
@@ -311,7 +564,6 @@ const FinancialAnalytics = ({}) => {
     );
   }
 
-  // For inventory pie chart, aggregate all SEs' inventories for overall breakdown
   const inventoryPerSE = {};
   inventoryData.forEach(({ se_abbr, item_name, qty }) => {
     if (!inventoryPerSE[se_abbr]) {
@@ -321,14 +573,13 @@ const FinancialAnalytics = ({}) => {
   });
 
   const inventoryBreakdownData = Object.entries(inventoryPerSE)
-    .sort((a, b) => b[1] - a[1]) // Sort descending by quantity
-    .slice(0, 10) // Take top 10
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
     .map(([se_abbr, qty]) => ({
       id: se_abbr,
       value: qty,
     }));
 
-  // Safely compute the latest valid date in YYYY-MM-DD format
   const validDates = financialData
     .map((item) => item.date)
     .filter((date) => date != null)
@@ -336,10 +587,9 @@ const FinancialAnalytics = ({}) => {
 
   const latestDateOnly =
     validDates.length > 0
-      ? validDates.sort().reverse()[0] // latest date in YYYY-MM-DD format
+      ? validDates.sort().reverse()[0]
       : null;
 
-  // Get all records from latest date (ignoring time)
   const latestRecordsMap = new Map();
 
   financialData.forEach((item) => {
@@ -385,6 +635,10 @@ const FinancialAnalytics = ({}) => {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10);
 
+  const worstRevenueSEsData = [...aggregatedLatestSEs.values()]
+    .sort((a, b) => a.revenue - b.revenue)
+    .slice(0, 10);
+
   const latestProfitRecords = latestRecords.map((item) => ({
     name: item.se_abbr ?? item.se_id,
     profit: Number(item.total_revenue || 0) - Number(item.total_expenses || 0),
@@ -406,7 +660,7 @@ const FinancialAnalytics = ({}) => {
       id: name,
       value: typeof value === "number" && !isNaN(value) ? value : 0,
     }))
-    .filter((item) => item.value > 0) // remove invalid or 0 values
+    .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
@@ -504,9 +758,8 @@ const FinancialAnalytics = ({}) => {
             title={`₱${Number(
               highestExpenseSE?.totalExpenses || 0
             ).toLocaleString()}`}
-            subtitle={`Highest Expenses: ${
-              highestExpenseSE?.name || "N/A"
-            } (${getExpenseLevel(highestExpenseSE?.totalExpenses)})`}
+            subtitle={`Highest Expenses: ${highestExpenseSE?.name || "N/A"
+              } (${getExpenseLevel(highestExpenseSE?.totalExpenses)})`}
             progress={0.9}
             increase={
               <Typography
@@ -535,15 +788,30 @@ const FinancialAnalytics = ({}) => {
       </Box>
       {/* Row 3 - Profit Over Time */}
       <Box backgroundColor={colors.primary[400]} p="20px" mt="20px">
-        <Typography
-          variant="h3"
-          fontWeight="bold"
-          color={colors.greenAccent[500]}
-        >
-          Profit Over Time (by Social Enterprise)
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb="10px">
+          <Typography
+            variant="h3"
+            fontWeight="bold"
+            color={colors.greenAccent[500]}
+          >
+            {chartTitle}
+          </Typography>
+          <Button
+            onClick={() => setShowTop5Mode(!showTop5Mode)}
+            variant="contained"
+            sx={{
+              backgroundColor: colors.blueAccent[700],
+              color: colors.grey[100],
+              "&:hover": {
+                backgroundColor: colors.blueAccent[800],
+              },
+            }}
+          >
+            {showTop5Mode ? "Show All History" : "Show Top 5"}
+          </Button>
+        </Box>
         <Box height="400px">
-          <POTLineChart data={profitOverTimeSeries} />
+          <POTLineChart data={displayedProfitOverTimeSeries} />
         </Box>
       </Box>
 
@@ -610,15 +878,30 @@ const FinancialAnalytics = ({}) => {
 
       {/* Row 8 - Equity Trend Comparison */}
       <Box backgroundColor={colors.primary[400]} p="20px" mt="20px">
-        <Typography
-          variant="h3"
-          fontWeight="bold"
-          color={colors.greenAccent[500]}
-        >
-          Equity Trend by Social Enterprise
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb="10px">
+          <Typography
+            variant="h3"
+            fontWeight="bold"
+            color={colors.greenAccent[500]}
+          >
+            {equityChartTitle}
+          </Typography>
+          <Button
+            onClick={() => setShowTop5ModeEquity(!showTop5ModeEquity)}
+            variant="contained"
+            sx={{
+              backgroundColor: colors.blueAccent[700],
+              color: colors.grey[100],
+              "&:hover": {
+                backgroundColor: colors.blueAccent[800],
+              },
+            }}
+          >
+            {showTop5ModeEquity ? "Show All History" : "Show Top 5"}
+          </Button>
+        </Box>
         <Box height="400px">
-          <LineChart data={equityTrendData} />
+          <LineChart data={displayedEquityOverTimeSeries} />
         </Box>
       </Box>
 
@@ -647,11 +930,11 @@ const FinancialAnalytics = ({}) => {
           fontWeight="bold"
           color={colors.greenAccent[500]}
         >
-          Worst 5 Social Enterprises by Revenue
+          Worst 10 Social Enterprises by Revenue
         </Typography>
         <Box height="400px">
           <FinancialBarChart
-            data={topRevenueSEsData}
+            data={worstRevenueSEsData}
             dataKey="revenue"
             label="Worst Revenue"
           />

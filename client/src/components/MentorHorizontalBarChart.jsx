@@ -15,14 +15,12 @@ const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
 
       try {
         const response = await axiosClient.get(
-          `${process.env.REACT_APP_API_BASE_URL}/api/mentor-analytics/${mentorId}`
+          `/api/mentor-analytics/${mentorId}`
         );
+
         const data = response.data;
 
-        if (
-          !data.avgRatingPerCategory ||
-          !Array.isArray(data.avgRatingPerCategory)
-        ) {
+        if (!data.avgRatingPerCategory || !Array.isArray(data.avgRatingPerCategory)) {
           console.warn("❌ Unexpected response:", data);
           setAvgRatings([]);
           return;
@@ -115,14 +113,7 @@ const MentorHorizontalBarChart = ({ mentorId, categoryType }) => {
           labelSkipHeight={12}
           labelTextColor={{ from: "color", modifiers: [["darker", 1.6]] }}
           tooltip={({ indexValue, value }) => (
-            <div
-              style={{
-                background: "#333",
-                padding: "6px",
-                borderRadius: "4px",
-                color: "#fff",
-              }}
-            >
+            <div style={{ background: "#333", padding: "6px", borderRadius: "4px", color: "#fff" }}>
               <strong>{indexValue}</strong>
               <br />
               Score: {value}

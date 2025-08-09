@@ -25,7 +25,7 @@ import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
 import { useAuth } from "../../context/authContext";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import axiosClient from "../../api/axiosClient"
+import axiosClient from "../../api/axiosClient";
 
 // 3. Destructure the new props from the function signature
 const Topbar = ({}) => {
@@ -43,8 +43,6 @@ const Topbar = ({}) => {
   const handleMenuClose = () => setAnchorEl(null);
   const handleNotifOpen = (event) => setNotifAnchorEl(event.currentTarget);
   const handleNotifClose = () => setNotifAnchorEl(null);
-
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
   const handleToggleExpand = async (notifId) => {
     setExpandedNotificationId((prev) =>
@@ -64,9 +62,7 @@ const Topbar = ({}) => {
         return;
       }
 
-      const requestUrl = `${API_BASE_URL}/api/notifications?receiver_id=${user.id}`;
-
-      const response = await axiosClient.get(requestUrl);
+      const response = await axiosClient.get(`/api/notifications?receiver_id=${user.id}`);
       setNotifications([...response.data]);
     } catch (error) {
       console.error("❌ Error fetching notifications:", error);
@@ -82,13 +78,7 @@ const Topbar = ({}) => {
   }, [user]);
 
   const markNotificationAsRead = async (notificationId) => {
-<<<<<<< HEAD
-    await axiosClient.put(`${process.env.REACT_APP_API_BASE_URL}/api/notifications/${notificationId}/read`, {
-      withCredentials: true, // ✅ If you need to send cookies/session
-    });
-=======
     await axiosClient.put(`${process.env.REACT_APP_API_BASE_URL}/api/notifications/${notificationId}/read`);
->>>>>>> 0fa781c16cb6e56a164463f0caacd63e37e4b755
 
     // Update local state
     setNotifications((prev) =>

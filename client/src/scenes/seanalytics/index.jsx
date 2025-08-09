@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import {
   Box,
@@ -8,6 +8,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Menu,
   Dialog,
   DialogActions,
   DialogContent,
@@ -25,6 +26,7 @@ import StarIcon from "@mui/icons-material/Star";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { tokens } from "../../theme";
 import SEPerformanceTrendChart from "../../components/SEPerformanceTrendChart";
+import DownloadIcon from "@mui/icons-material/Download";
 import PieChart from "../../components/PieChart";
 import LikertChart from "../../components/LikertChart";
 import RadarChart from "../../components/RadarChart";
@@ -33,11 +35,10 @@ import { useTheme } from "@mui/material/styles";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import StatBox from "../../components/StatBox";
 import DualAxisLineChart from "../../components/DualAxisLineChart";
-import ScatterPlot from "../../components/ScatterPlot";
+import CashFlowChart from "../../components/CashFlowChart.jsx";
 import PeopleIcon from "@mui/icons-material/People";
 import InventoryValuePie from "../../components/TotalInventoryPieChart.jsx";
 import InventoryTurnoverBar from "../../components/InventoryTurnoverBarChart.jsx";
-import axiosClient from "../../api/axiosClient.js";
 
 const SEAnalytics = () => {
   const theme = useTheme();
@@ -45,6 +46,13 @@ const SEAnalytics = () => {
   const { id } = useParams(); // Extract the `id` from the URL
   const [selectedSEId, setSelectedSEId] = useState(id); // State to manage selected SE
   const [socialEnterprises, setSocialEnterprises] = useState([]); // List of all social enterprises
+  const performanceOverviewChart = useRef(null);
+  const painPointsChart = useRef(null);
+  const scoreDistributionChart = useRef(null);
+  const revenueVSexpensesChart = useRef(null);
+  const cashFlowAnalysisChart = useRef(null);
+  const equityChart = useRef(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [selectedSE, setSelectedSE] = useState(null); // Selected social enterprise object
   const [pieData, setPieData] = useState([]); // Real common challenges data
   const [likertData, setLikertData] = useState([]); // Real Likert scale data
@@ -69,8 +77,10 @@ const SEAnalytics = () => {
   const [financialData, setFinancialData] = useState([]);
   const [cashFlowRaw, setCashFlowRaw] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
 
- useEffect(() => {
+  useEffect(() => {
     const fetchApplicationDetails = async () => {
       if (!selectedSE || !selectedSE.accepted_application_id) {
         setSEApplication(null);
@@ -78,11 +88,12 @@ const SEAnalytics = () => {
       }
 
       try {
-       const res = await axiosClient.get(
+        const res = await fetch(
           `${process.env.REACT_APP_API_BASE_URL}/get-accepted-application/${selectedSE.accepted_application_id}`
         );
+        if (!res.ok) throw new Error("Failed to fetch application details");
 
-        const data = res.data;
+        const data = await res.json();
         setSEApplication(data);
       } catch (error) {
         console.error("Error fetching application details:", error);
@@ -90,18 +101,18 @@ const SEAnalytics = () => {
       }
     };
 
-  fetchApplicationDetails();
-}, [selectedSE]);
+    fetchApplicationDetails();
+  }, [selectedSE]);
 
-
+  // Fetch all necessary data for the page
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Fetch SE list
-        const seResponse = await axios.get(
+        // Fetch SE list
+        const seResponse = await fetch(
           `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprises`
         );
-        const seData = seResponse.data;
+        const seData = await seResponse.json();
 
         const formattedSEData = seData.map((se) => ({
           id: se?.se_id ?? "",
@@ -122,20 +133,19 @@ const SEAnalytics = () => {
           setSelectedSEId(id);
         }
 
-        // 2. Financial Data
-        const [financialResult, cashFlowResult, inventoryResult] =
-          await Promise.allSettled([
-            axiosClient.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`
-            ),
-            axiosClient.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/cashflow`
-            ),
-            axiosClient.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`
-            ),
-          ]);
+        const results = await Promise.allSettled([
+          axios.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/financial-statements`
+          ),
+          axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`),
+          axios.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/inventory-distribution`
+          ),
+        ]);
 
+        const [financialResult, cashFlowResult, inventoryResult] = results;
+
+        // Handle financial data
         if (financialResult.status === "fulfilled") {
           setFinancialData(financialResult.value.data);
         } else {
@@ -145,6 +155,7 @@ const SEAnalytics = () => {
           );
         }
 
+        // Handle cash flow data
         if (cashFlowResult.status === "fulfilled") {
           setCashFlowRaw(cashFlowResult.value.data);
         } else {
@@ -154,6 +165,7 @@ const SEAnalytics = () => {
           );
         }
 
+        // Handle inventory data
         if (inventoryResult.status === "fulfilled") {
           setInventoryData(inventoryResult.value.data);
         } else {
@@ -163,26 +175,24 @@ const SEAnalytics = () => {
           );
         }
 
-        // 3. SE-specific analytics
+        // Fetch SE-specific analytics (with fallbacks)
         if (id) {
           const analyticsResults = await Promise.allSettled([
-            axiosClient.get(
+            fetch(
               `${process.env.REACT_APP_API_BASE_URL}/api/se-analytics-stats/${id}`
             ),
-            axiosClient.get(
+            fetch(
               `${process.env.REACT_APP_API_BASE_URL}/api/critical-areas/${id}`
             ),
-            axiosClient.get(
+            fetch(
               `${process.env.REACT_APP_API_BASE_URL}/api/common-challenges/${id}`
             ),
-            axiosClient.get(
+            fetch(
               `${process.env.REACT_APP_API_BASE_URL}/api/likert-data/${id}`
             ),
-            axiosClient.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/radar-data/${id}`
-            ),
-            axiosClient.get(
-              `${process.env.REACT_APP_API_BASE_URL}/api/getMentorEvaluationsBySEID/${id}`
+            fetch(`${process.env.REACT_APP_API_BASE_URL}/api/radar-data/${id}`),
+            fetch(
+              `${process.env.REACT_APP_API_BASE_URL}/getMentorEvaluationsBySEID/${id}`
             ),
           ]);
 
@@ -197,7 +207,8 @@ const SEAnalytics = () => {
 
           // Evaluations
           if (evaluationsResult.status === "fulfilled") {
-            const rawEvaluations = evaluationsResult.value.data;
+            const rawEvaluations = await evaluationsResult.value.json();
+
             const formattedEvaluationsData = rawEvaluations.map(
               (evaluation) => ({
                 id: evaluation.evaluation_id,
@@ -208,6 +219,7 @@ const SEAnalytics = () => {
                 acknowledged: evaluation.acknowledged ? "Yes" : "No",
               })
             );
+
             setEvaluationsData(formattedEvaluationsData);
           } else {
             console.warn("No evaluations found or failed to fetch.");
@@ -215,7 +227,7 @@ const SEAnalytics = () => {
 
           // Stats
           if (statsResult.status === "fulfilled") {
-            const statsData = statsResult.value.data;
+            const statsData = await statsResult.value.json();
             setStats({
               registeredUsers:
                 Number(statsData.registeredUsers?.[0]?.total_users) || 0,
@@ -234,12 +246,13 @@ const SEAnalytics = () => {
 
           // Critical Areas
           if (criticalAreasResult.status === "fulfilled") {
-            setCriticalAreas(criticalAreasResult.value.data);
+            const criticalAreasData = await criticalAreasResult.value.json();
+            setCriticalAreas(criticalAreasData);
           }
 
-          // Pie Chart (common challenges)
+          // Pie Chart
           if (pieResult.status === "fulfilled") {
-            const rawPieData = pieResult.value.data;
+            const rawPieData = await pieResult.value.json();
             const formattedPieData = Array.from(
               new Map(
                 rawPieData.map((item, index) => [
@@ -264,12 +277,13 @@ const SEAnalytics = () => {
 
           // Likert
           if (likertResult.status === "fulfilled") {
-            setLikertData(likertResult.value.data);
+            const rawLikertData = await likertResult.value.json();
+            setLikertData(rawLikertData);
           }
 
           // Radar
           if (radarResult.status === "fulfilled") {
-            const radarChartData = radarResult.value.data;
+            const radarChartData = await radarResult.value.json();
             if (Array.isArray(radarChartData)) {
               setRadarData(radarChartData);
             } else {
@@ -278,10 +292,7 @@ const SEAnalytics = () => {
           }
         }
       } catch (error) {
-        console.error(
-          "Error fetching data:",
-          error?.response?.data || error.message
-        );
+        console.error("Error fetching data:", error);
       } finally {
         setIsLoadingEvaluations(false);
       }
@@ -294,6 +305,102 @@ const SEAnalytics = () => {
   const selectedSEFinancialData = financialData.filter(
     (item) => item.se_id === selectedSEId
   );
+
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleGenerateReport = (type) => {
+    handleClose();
+    if (type === "collaboration") {
+      handleGenerateCollaborationReport(); // or handleCollaborationReport()
+    } else if (type === "stakeholder") {
+      handleDownloadStakeholderReport();
+    }
+  };
+
+  const handleGenerateCollaborationReport = () => {
+    setIsExporting(true);
+
+    setTimeout(async () => {
+      const radarSVG = performanceOverviewChart.current?.querySelector("svg");
+      const pieSVG = painPointsChart.current?.querySelector("svg");
+      const likertSVG = scoreDistributionChart.current?.querySelector("svg");
+
+      if (!radarSVG || !pieSVG || !likertSVG) {
+        setIsExporting(false);
+        return alert("One or both charts not found");
+      }
+
+      const serialize = (svg) => new XMLSerializer().serializeToString(svg);
+
+      const svgToBase64 = async (svgData, bbox) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = bbox.width;
+        canvas.height = bbox.height;
+        const ctx = canvas.getContext("2d");
+        const img = new Image();
+        const blob = new Blob([svgData], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+
+        return new Promise((resolve) => {
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL("image/png"));
+          };
+          img.src = url;
+        });
+      };
+
+      try {
+        const radarData = serialize(radarSVG);
+        const pieData = serialize(pieSVG);
+        const likertData = serialize(likertSVG);
+
+        const radarBBox = radarSVG.getBoundingClientRect();
+        const pieBBox = pieSVG.getBoundingClientRect();
+        const likertBBox = likertSVG.getBoundingClientRect();
+
+        const radarBase64 = await svgToBase64(radarData, radarBBox);
+        const pieBase64 = await svgToBase64(pieData, pieBBox);
+        const likertBase64 = await svgToBase64(likertData, likertBBox);
+
+        const response = await axios.post(
+          `${process.env.REACT_APP_API_BASE_URL}/api/adhoc-report`,
+          {
+            chartImageRadar: radarBase64,
+            chartImagePie: pieBase64,
+            scoreDistributionLikert: likertBase64,
+            se_id: selectedSE?.id,
+            period: "quarterly",
+          },
+          {
+            responseType: "blob",
+          }
+        );
+
+        const blobUrl = URL.createObjectURL(
+          new Blob([response.data], { type: "application/pdf" })
+        );
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `Adhoc_Report_${selectedSE?.abbr || "Report"}.pdf`;
+        a.click();
+      } catch (err) {
+        console.error("❌ Failed to generate report:", err);
+        alert("Failed to generate report");
+      } finally {
+        setIsExporting(false);
+      }
+    }, 100);
+  };
 
   // Process financial data for StatBoxes and charts specific to the selected SE
   const currentSEFinancialMetrics = {
@@ -356,73 +463,171 @@ const SEAnalytics = () => {
       ).toFixed(2)
     : "0.00";
 
-  // Format revenue vs expenses for DualAxisLineChart (for selected SE)
-  const selectedSERevenueVsExpensesData = [
-    {
-      id: "Revenue",
-      color: colors.greenAccent[500],
-      data: currentSEFinancialMetrics.revenueVsExpenses.map((d) => ({
-        x: d.x,
-        y: d.revenue,
-      })),
-    },
-    {
-      id: "Expenses",
-      color: colors.redAccent[500],
-      data: currentSEFinancialMetrics.revenueVsExpenses.map((d) => ({
-        x: d.x,
-        y: d.expenses,
-      })),
-    },
-  ];
+  const getQuarterLabel = (date) => {
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    if (month >= 0 && month <= 2) return `Q1 ${year}`;
+    if (month >= 3 && month <= 5) return `Q2 ${year}`;
+    if (month >= 6 && month <= 8) return `Q3 ${year}`;
+    return `Q4 ${year}`;
+  };
 
-  // Format owner's equity for DualAxisLineChart (for selected SE)
-  const sortedEquityTrend = [...currentSEFinancialMetrics.equityTrend].sort(
-    (a, b) => new Date(a.x) - new Date(b.x)
-  );
+  const selectedSERevenueVsExpensesData = useMemo(() => {
+    if (!currentSEFinancialMetrics?.revenueVsExpenses?.length) return [];
 
-  // Then format for the chart
-  const selectedSEEquityTrendData = [
-    {
-      id: "Owner's Equity",
-      color: colors.blueAccent[500],
-      data: sortedEquityTrend.map((d) => ({
-        x: new Date(d.x).toLocaleString("default", {
-          month: "short",
-          year: "numeric",
-        }),
-        y: d.y,
-      })),
-    },
-  ];
+    const quarterBuckets = {};
 
-  // Process cash flow data for the selected SE for ScatterPlot
-  const selectedSECashFlowRaw = cashFlowRaw.filter(
-    (item) => item.se_id === selectedSEId
-  );
+    currentSEFinancialMetrics.revenueVsExpenses.forEach(
+      ({ x, revenue, expenses }) => {
+        const date = new Date(x);
+        const quarter = getQuarterLabel(date);
 
-  const selectedSECashFlowData = [
-    {
-      id: "Inflow",
-      data: selectedSECashFlowRaw.map((item) => ({
-        x: new Date(item.date).toLocaleString("default", {
-          month: "short",
-          year: "numeric",
-        }),
-        y: Number(item.inflow),
-      })),
-    },
-    {
-      id: "Outflow",
-      data: selectedSECashFlowRaw.map((item) => ({
-        x: new Date(item.date).toLocaleString("default", {
-          month: "short",
-          year: "numeric",
-        }),
-        y: Number(item.outflow),
-      })),
-    },
-  ];
+        if (!quarterBuckets[quarter]) {
+          quarterBuckets[quarter] = { revenues: [], expenses: [] };
+        }
+
+        quarterBuckets[quarter].revenues.push(Number(revenue) || 0);
+        quarterBuckets[quarter].expenses.push(Number(expenses) || 0);
+      }
+    );
+
+    const revenueData = [];
+    const expenseData = [];
+
+    Object.entries(quarterBuckets).forEach(
+      ([quarter, { revenues, expenses }]) => {
+        const avgRevenue = revenues.length
+          ? Math.round(
+              revenues.reduce((sum, val) => sum + val, 0) / revenues.length
+            )
+          : null;
+
+        const avgExpense = expenses.length
+          ? Math.round(
+              expenses.reduce((sum, val) => sum + val, 0) / expenses.length
+            )
+          : null;
+
+        revenueData.push({ x: quarter, y: avgRevenue });
+        expenseData.push({ x: quarter, y: avgExpense });
+      }
+    );
+
+    return [
+      {
+        id: "Revenue",
+        color: "#4CAF50", // Always green for revenue
+        data: revenueData,
+      },
+      {
+        id: "Expenses",
+        color: "#f44336", // Always red for expenses
+        data: expenseData,
+      },
+    ];
+  }, [currentSEFinancialMetrics, isExporting]);
+
+  const selectedSEEquityTrendData = useMemo(() => {
+    if (!currentSEFinancialMetrics?.equityTrend?.length) return [];
+
+    const quarterBuckets = {};
+
+    currentSEFinancialMetrics.equityTrend.forEach(({ x, y }) => {
+      const date = new Date(x);
+      const quarter = getQuarterLabel(date);
+
+      if (!quarterBuckets[quarter]) {
+        quarterBuckets[quarter] = [];
+      }
+
+      quarterBuckets[quarter].push(Number(y) || 0);
+    });
+
+    const formattedData = Object.entries(quarterBuckets).map(
+      ([quarter, values]) => {
+        const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+        return {
+          x: quarter,
+          y: Math.round(avg),
+        };
+      }
+    );
+
+    return [
+      {
+        id: "Equity",
+        color: "#4CAF50", // Always green for equity
+        data: formattedData,
+      },
+    ];
+  }, [currentSEFinancialMetrics, isExporting]);
+
+  const selectedSECashFlowQuarterly = useMemo(() => {
+    if (!selectedSEId || !Array.isArray(cashFlowRaw)) return [];
+
+    const filtered = cashFlowRaw.filter((item) => item.se_id === selectedSEId);
+    const quarterBuckets = {};
+
+    filtered.forEach((item) => {
+      if (!item?.date) return;
+      const date = new Date(item.date);
+      const quarter = getQuarterLabel(date);
+
+      if (!quarterBuckets[quarter]) {
+        quarterBuckets[quarter] = { inflows: [], outflows: [] };
+      }
+
+      quarterBuckets[quarter].inflows.push(Number(item.inflow) || 0);
+      quarterBuckets[quarter].outflows.push(Number(item.outflow) || 0);
+    });
+
+    const inflowData = [];
+    const outflowData = [];
+
+    Object.entries(quarterBuckets).forEach(
+      ([quarter, { inflows, outflows }]) => {
+        const avgInflow = inflows.length
+          ? Math.round(inflows.reduce((sum, v) => sum + v, 0) / inflows.length)
+          : 0;
+
+        const avgOutflow = outflows.length
+          ? Math.round(
+              outflows.reduce((sum, v) => sum + v, 0) / outflows.length
+            )
+          : 0;
+
+        inflowData.push({ x: quarter, y: avgInflow });
+        outflowData.push({ x: quarter, y: avgOutflow });
+      }
+    );
+
+    return [
+      { id: "Inflow", data: inflowData, color: "#4CAF50" },
+      { id: "Outflow", data: outflowData, color: "#f44336" },
+    ];
+  }, [cashFlowRaw, selectedSEId]);
+
+  // ✅ Transform to stacked bar chart format
+  const transformedCashFlowData = useMemo(() => {
+    const inflowMap = new Map();
+    const outflowMap = new Map();
+
+    selectedSECashFlowQuarterly.forEach((entry) => {
+      if (entry.id === "Inflow") {
+        entry.data.forEach(({ x, y }) => inflowMap.set(x, y));
+      } else if (entry.id === "Outflow") {
+        entry.data.forEach(({ x, y }) => outflowMap.set(x, y));
+      }
+    });
+
+    const allQuarters = new Set([...inflowMap.keys(), ...outflowMap.keys()]);
+
+    return Array.from(allQuarters).map((quarter) => ({
+      quarter,
+      Inflow: inflowMap.get(quarter) || 0,
+      Outflow: outflowMap.get(quarter) || 0,
+    }));
+  }, [selectedSECashFlowQuarterly]);
 
   const filteredInventoryData = inventoryData.filter(
     (item) => item.se_abbr === selectedSE?.abbr
@@ -522,8 +727,8 @@ const SEAnalytics = () => {
 
   const handleViewExistingEvaluation = async (evaluation_id) => {
     try {
-      const response = await axiosClient.get(
-        `${process.env.REACT_APP_API_BASE_URL}/api/get-Evaluation-Details`,
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_BASE_URL}/getEvaluationDetails`,
         {
           params: { evaluation_id },
         }
@@ -572,6 +777,110 @@ const SEAnalytics = () => {
     }
   };
 
+  const handleDownloadStakeholderReport = () => {
+    setIsExporting(true);
+
+    setTimeout(async () => {
+      const revenueSVG = revenueVSexpensesChart.current?.querySelector("svg");
+      const cashFlowSVG = cashFlowAnalysisChart.current?.querySelector("svg");
+      const equitySVG = equityChart.current?.querySelector("svg");
+
+      if (
+        !revenueSVG ||
+        !selectedSEId ||
+        !currentSEFinancialMetrics ||
+        !cashFlowSVG ||
+        !equitySVG
+      ) {
+        setIsExporting(false);
+        return alert("Revenue chart or data not found");
+      }
+
+      const serialize = (svg) => new XMLSerializer().serializeToString(svg);
+
+      const svgToBase64 = async (svgData, bbox) => {
+        const scale = 3;
+        const canvas = document.createElement("canvas");
+        canvas.width = bbox.width * scale;
+        canvas.height = bbox.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale); // upscale before drawing
+
+        const img = new Image();
+        const blob = new Blob([svgData], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+
+        return new Promise((resolve) => {
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL("image/png"));
+          };
+          img.src = url;
+        });
+      };
+
+      try {
+        const revenueSVGData = serialize(revenueSVG);
+        const cashFlowSVGData = serialize(cashFlowSVG);
+        const equitySVGData = serialize(equitySVG);
+
+        const bbox = revenueSVG.getBoundingClientRect();
+        const cashFlowSVGBBox = cashFlowSVG.getBoundingClientRect();
+        const equitySVGBBox = equitySVG.getBoundingClientRect();
+
+        const chartImageBase64 = await svgToBase64(revenueSVGData, bbox);
+        const cashFlowImageBase64 = await svgToBase64(
+          cashFlowSVGData,
+          cashFlowSVGBBox
+        );
+        const equityImageBase64 = await svgToBase64(
+          equitySVGData,
+          equitySVGBBox
+        );
+
+        const response = await axios.post(
+          `${process.env.REACT_APP_API_BASE_URL}/api/financial-report`,
+          {
+            chartImage: chartImageBase64,
+            cashFlowImage: cashFlowImageBase64,
+            equityImage: equityImageBase64,
+            selectedSEId,
+            totalRevenue: currentSEFinancialMetrics.totalRevenue,
+            totalExpenses: currentSEFinancialMetrics.totalExpenses,
+            netIncome: currentSEFinancialMetrics.netIncome,
+            totalAssets: currentSEFinancialMetrics.totalAssets,
+            selectedSERevenueVsExpensesData,
+            transformedCashFlowData,
+            selectedSEEquityTrendData,
+            inventoryTurnoverByItemData,
+            netProfitMargin,
+            grossProfitMargin,
+            debtToAssetRatio,
+          },
+          {
+            responseType: "blob",
+          }
+        );
+
+        const blobUrl = URL.createObjectURL(
+          new Blob([response.data], { type: "application/pdf" })
+        );
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `Stakeholder_Report_${selectedSE?.abbr || "Report"}.pdf`;
+        a.click();
+      } catch (err) {
+        console.error("❌ Failed to generate stakeholder report:", err);
+        alert("Failed to generate report");
+      } finally {
+        setIsExporting(false);
+      }
+    }, 100);
+  };
+
   // If no social enterprise is found, show an error message
   if (!selectedSE && socialEnterprises.length > 0) {
     return <Box>No Social Enterprise found</Box>;
@@ -580,14 +889,35 @@ const SEAnalytics = () => {
   return (
     <Box m="20px">
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center">
-        {/* Back Button and Dropdown Container */}
-        <Box display="flex" alignItems="center" gap="10px">
-          {/* Page Title */}
-          <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
-            {selectedSE ? `${selectedSE.name} Analytics` : "Loading..."}
-          </Typography>
-        </Box>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={2}
+      >
+        {/* Left: SE Name */}
+        <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
+          {selectedSE ? `${selectedSE.name} Analytics` : "Loading..."}
+        </Typography>
+
+        {/* Right: Export Button */}
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<DownloadIcon />}
+          onClick={handleMenuClick}
+        >
+          Generate Report
+        </Button>
+
+        <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+          <MenuItem onClick={() => handleGenerateReport("collaboration")}>
+            Evaluation Report
+          </MenuItem>
+          <MenuItem onClick={() => handleGenerateReport("stakeholder")}>
+            Financial Report
+          </MenuItem>
+        </Menu>
       </Box>
 
       <Box
@@ -1350,13 +1680,14 @@ const SEAnalytics = () => {
           display="flex"
           justifyContent="center"
           alignItems="center"
+          ref={painPointsChart}
         >
           {pieData.length === 0 ? (
             <Typography variant="h6" color={colors.grey[300]}>
               No common challenges found.
             </Typography>
           ) : (
-            <PieChart data={pieData} />
+            <PieChart data={pieData} isExporting={isExporting} />
           )}
         </Box>
       </Box>
@@ -1377,13 +1708,14 @@ const SEAnalytics = () => {
           display="flex"
           justifyContent="center"
           alignItems="center"
+          ref={scoreDistributionChart}
         >
           {likertData.length === 0 ? (
             <Typography variant="h6" color={colors.grey[300]}>
               No performance ratings available.
             </Typography>
           ) : (
-            <LikertChart data={likertData} />
+            <LikertChart data={likertData} isExporting={isExporting} />
           )}
         </Box>
       </Box>
@@ -1405,13 +1737,14 @@ const SEAnalytics = () => {
           display="flex"
           justifyContent="center"
           alignItems="center"
+          ref={performanceOverviewChart}
         >
           {radarData.length === 0 ? (
             <Typography variant="h6" color={colors.grey[300]}>
               Performance Overview Unavailable.
             </Typography>
           ) : (
-            <RadarChart radarData={radarData} />
+            <RadarChart radarData={radarData} isExporting={isExporting} />
           )}
         </Box>
       </Box>
@@ -1507,9 +1840,13 @@ const SEAnalytics = () => {
           >
             Revenue vs Expenses Over Time
           </Typography>
-          <Box height="400px">
+
+          <Box height="400px" ref={revenueVSexpensesChart}>
             {selectedSERevenueVsExpensesData[0]?.data?.length > 0 ? (
-              <DualAxisLineChart data={selectedSERevenueVsExpensesData} />
+              <DualAxisLineChart
+                data={selectedSERevenueVsExpensesData}
+                isExporting={isExporting}
+              />
             ) : (
               <Typography
                 variant="h6"
@@ -1522,7 +1859,7 @@ const SEAnalytics = () => {
           </Box>
         </Box>
 
-        {/* Cash Flow Scatter Plot for Selected SE */}
+        {/* Cash Flow Quarterly Bar Chart for Selected SE */}
         <Box backgroundColor={colors.primary[400]} p="20px">
           <Typography
             variant="h3"
@@ -1530,11 +1867,14 @@ const SEAnalytics = () => {
             color={colors.greenAccent[500]}
             mb={2}
           >
-            Cash Flow (Inflow vs Outflow)
+            Cash Flow (Inflow vs Outflow per Quarter)
           </Typography>
-          <Box height="400px">
-            {selectedSECashFlowData[0]?.data?.length > 0 ? (
-              <ScatterPlot data={selectedSECashFlowData} />
+          <Box height="400px" ref={cashFlowAnalysisChart}>
+            {selectedSECashFlowQuarterly.length > 0 ? (
+              <CashFlowChart
+                data={transformedCashFlowData}
+                isExporting={isExporting}
+              />
             ) : (
               <Typography
                 variant="h6"
@@ -1557,9 +1897,12 @@ const SEAnalytics = () => {
           >
             Owner's Equity Over Time
           </Typography>
-          <Box height="400px">
+          <Box height="400px" ref={equityChart}>
             {selectedSEEquityTrendData[0]?.data?.length > 0 ? (
-              <DualAxisLineChart data={selectedSEEquityTrendData} />
+              <DualAxisLineChart
+                data={selectedSEEquityTrendData}
+                isExporting={isExporting}
+              />
             ) : (
               <Typography
                 variant="h6"

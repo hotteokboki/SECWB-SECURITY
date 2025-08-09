@@ -21,7 +21,6 @@ import {
   DialogActions,
   Grid,
 } from "@mui/material";
-import axiosClient from "../../api/axiosClient";
 
 const ProgramPage = () => {
   const [programs, setPrograms] = useState([]);
@@ -52,10 +51,11 @@ const ProgramPage = () => {
         setLoading(true);
         setError(null);
 
-        const programsResponse = await axiosClient.get(
+        const programsResponse = await fetch(
           `${process.env.REACT_APP_API_BASE_URL}/api/get-programs`
         );
-        const programsData = programsResponse.data;
+        if (!programsResponse.ok) throw new Error("Failed to fetch programs");
+        const programsData = await programsResponse.json();
 
         const mappedPrograms = programsData.map((item) => ({
           ...item,
@@ -69,11 +69,12 @@ const ProgramPage = () => {
 
         console.log(mappedPrograms);
 
-        const lseedCoordinatorsResponse = await axiosClient.get(
-          `/api/get-lseed-coordinators`
+        const lseedCoordinatorsResponse = await fetch(
+          `${process.env.REACT_APP_API_BASE_URL}/api/get-lseed-coordinators`
         );
-
-        const lseedCoordinatorsData = lseedCoordinatorsResponse.data;
+        if (!lseedCoordinatorsResponse.ok)
+          throw new Error("Failed to fetch LSEED coordinators");
+        const lseedCoordinatorsData = await lseedCoordinatorsResponse.json();
         setAvailableLSEEDCoordinators(lseedCoordinatorsData);
       } catch (error) {
         setSnackbarMessage(error.message || "Error fetching data");
@@ -123,11 +124,12 @@ const ProgramPage = () => {
         user_id: coordinatorIdToAssign,
       };
 
-      const response = await axiosClient.post(
+      const response = await fetch(
         `${process.env.REACT_APP_API_BASE_URL}/api/assign-program-coordinator`,
-        payload,
         {
-          headers: { "Content-Type": "application/json" }
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         }
       );
 
@@ -188,7 +190,7 @@ const ProgramPage = () => {
       }
 
       // Send the program data to the backend
-      const response = await axiosClient.post(
+      const response = await axios.post(
         `${process.env.REACT_APP_API_BASE_URL}/api/programs`,
         programFormData
       );

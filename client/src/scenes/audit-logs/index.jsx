@@ -15,24 +15,26 @@ const AuditLogsPage = () => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
 
     useEffect(() => {
-        const fetchLogs = async () => {
-            try {
-            setLoading(true);
-            const response = await axiosClient(`/api/get-audit-logs`);
-            const data = response.data;
-            setLogs(data.logs);
-            console.log(data.logs);
-            } catch (err) {
-            console.error(err);
-            setError(err.message || "An error occurred while fetching logs.");
-            setSnackbarOpen(true);
-            } finally {
-            setLoading(false);
-            }
-        };
+    const fetchLogs = async () => {
+        try {
+        setLoading(true);
+        const response = await axiosClient.get(`/api/get-audit-logs`);
+        
+        const data = await response.data;
+        setLogs(data.logs); // ✅ THIS FIX
 
-        fetchLogs(); 
-    }, []); 
+        console.log(data.logs)
+        } catch (err) {
+        console.error(err);
+        setError(err.message || "An error occurred while fetching logs.");
+        setSnackbarOpen(true);
+        } finally {
+        setLoading(false);
+        }
+    };
+
+    fetchLogs();
+    }, []);
 
     const columns = [
         {

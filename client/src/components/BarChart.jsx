@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { ResponsiveBar } from "@nivo/bar";
 import { useTheme, Button, MenuItem, Select, Typography } from "@mui/material";
 import { tokens } from "../theme";
 import { useAuth } from "../context/authContext";
+import axiosClient from "../api/axiosClient";
 
 const CustomTooltip = ({ value, indexValue, id, data }) => {
   const se1 = data.find((d) => d.category === indexValue);
@@ -62,7 +62,6 @@ const BarChart = ( {} ) => {
   const [loading, setLoading] = useState(false);
   const isLSEEDCoordinator = user?.roles?.includes("LSEED-Coordinator");
 
-
   useEffect(() => {
     const fetchSEs = async () => {
       
@@ -70,19 +69,17 @@ const BarChart = ( {} ) => {
       
       try {
         if (isLSEEDCoordinator) {
-          const res = await axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`, {
-            withCredentials: true, // Equivalent to credentials: "include"
-          });
+          const res = await axiosClient.get(`/api/get-program-coordinator`);
           
           const program = res.data[0]?.name;
             
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesForComparison`,
+            `/api/getAllSocialEnterprisesForComparison`,
             { params: { program } }
           );
         } else {
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesForComparison`
+            `/api/getAllSocialEnterprisesForComparison`
           );
         }
         setSeList(response.data);
@@ -102,10 +99,7 @@ const BarChart = ( {} ) => {
   const fetchComparisonData = async (se1, se2) => {
     setLoading(true);
     try {
-      const response = await axiosClient.get(
-        `${process.env.REACT_APP_API_BASE_URL}/comparePerformanceScore/${se1}/${se2}`
-      );
-      console.log("Fetched Comparison Data:", response.data);
+      const response = await axiosClient.get(`/api/comparePerformanceScore/${se1}/${se2}`);
 
       const categoryMap = {};
       const abbrMap = {}; // Store abbreviations for each SE ID
@@ -143,7 +137,6 @@ const BarChart = ( {} ) => {
     setChartData([]);
   };
 
-  console.log("chart data: ", chartData);
   return (
     <div style={{ height: "100%", width: "100%" }}>
       {selectedSEs.length < 2 ? (

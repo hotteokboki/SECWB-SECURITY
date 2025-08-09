@@ -63,6 +63,8 @@ const { getMentorshipsByMentorId,
   getMentorshipCountByMentorID,
   getPendingSchedulesForMentor,
   getProgramCoordinatorsByMentorshipID,
+  getSuggestedCollaborations,
+  getCollaborators,
 } = require("./controllers/mentorshipsController.js");
 const { addSocialEnterprise } = require("./controllers/socialenterprisesController");
 const { getEvaluationsByMentorID,
@@ -108,6 +110,7 @@ const { getApplicationList } = require("./controllers/menteesFormSubmissionsCont
 const { getMentorFormApplications } = require("./controllers/mentorFormApplicationController.js");
 const { getSignUpPassword } = require("./controllers/signuppasswordsController.js");
 const { getAuditLogs } = require("./controllers/auditlogsController.js");
+const { insertCollaboration, requestCollaborationInsert, getExistingCollaborations, getCollaborationRequests, getCollaborationRequestDetails } = require("./controllers/mentorshipcollaborationController.js");
 const app = express();
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -190,6 +193,12 @@ const isAjaxRequest = (req, res, next) => {
   }
   return res.status(403).json({ message: "Forbidden: direct access not allowed" });
 };
+
+// Reuse ONE transporter (don’t create per request)
+const mailer = nodemailer.createTransport({
+  service: "Gmail",
+  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+});
 
 // First check auth and AJAX for /api
 app.use('/api', isAuthenticated, isAjaxRequest);
@@ -782,8 +791,8 @@ app.post("/logout", (req, res) => {
     }
   });
 });
-
-app.post("/api/apply-as-mentor", async (req, res) => {
+// DO NOT MODIFY ANYTHING IN THIS API
+app.post("/apply-as-mentor", async (req, res) => {
   const {
     affiliation,
     motivation,
@@ -1067,88 +1076,16 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-//Decline Application
-
-app.post("/api/notify-mentor-application-status", async (req, res) => {
-  const { applicationId, status } = req.body;
-
-  if (!applicationId || !status) {
-    return res.status(400).json({ message: "applicationId and status are required." });
-  }
-
-  try {
-    // 🔍 Get mentor application record
-    const { rows } = await pgDatabase.query(
-      `SELECT first_name, last_name, email FROM mentor_form_application WHERE id = $1`,
-      [applicationId]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ message: "Application not found." });
-    }
-
-    const { first_name, email } = rows[0];
-
-    // ✉️ Set up email transport
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // 📧 Compose Declined email only
-    const subject = "Your LSEED Mentor Application Status";
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
-        <p style="margin: 0 0 16px;">Dear ${first_name},</p>
-
-        <p style="margin: 0 0 16px;">
-          Thank you for your interest in becoming a mentor at the <strong>LSEED Center</strong>.
-        </p>
-
-        <p style="margin: 0 0 16px;">
-          After careful consideration, we regret to inform you that your application has not been approved at this time.
-        </p>
-
-        <p style="margin: 0;">
-          We encourage you to stay connected and consider applying again in the future.
-        </p>
-
-        <p style="margin: 0;">
-          Warm regards,<br/>
-          The LSEED Team
-        </p>
-      </div>
-    `;
-
-    // ✉️ Send email
-    await transporter.sendMail({
-      from: `"LSEED Center" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject,
-      html,
-    });
-
-    console.log(`✅ Declined email sent to ${email}`);
-    res.status(200).json({ message: "Decline notification email sent successfully." });
-  } catch (err) {
-    console.error("❌ Error sending email:", err);
-    res.status(500).json({ message: "Failed to send email notification." });
-  }
-});
-// TO DO 
-app.post("/signup-lseed-coordinator", async (req, res) => {
+// DO NOT MODIFY ANYTHING IN THIS API
+app.post("/signup-lseed-role", async (req, res) => {
   const { firstName, lastName, email, contactno, password, token } = req.body;
 
-  // Validate required fields
   if (!firstName || !lastName || !email || !contactno || !password || !token) {
     return res.status(400).json({ message: "All fields and token are required." });
   }
 
   try {
-    // 1️⃣ Validate the invite token
+    // 1️⃣ Validate the invite token and retrieve role
     const inviteResult = await pgDatabase.query(
       `SELECT * FROM coordinator_invites WHERE token = $1 AND expires_at > NOW()`,
       [token]
@@ -1157,6 +1094,10 @@ app.post("/signup-lseed-coordinator", async (req, res) => {
     if (inviteResult.rows.length === 0) {
       return res.status(400).json({ message: "Invalid or expired invite token." });
     }
+
+    const invitedRole = inviteResult.rows[0].role || 'LSEED-Coordinator';
+
+    console.log(invitedRole);
 
     // 2️⃣ Check if email already exists
     const existingUser = await pgDatabase.query(
@@ -1171,24 +1112,22 @@ app.post("/signup-lseed-coordinator", async (req, res) => {
     // 3️⃣ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4️⃣ Insert new coordinator into users table
+    // 4️⃣ Insert user with correct role
     const userResult = await pgDatabase.query(
       `
       INSERT INTO users (first_name, last_name, email, password, contactnum, roles, isactive)
-      VALUES ($1, $2, $3, $4, $5, 'LSEED-Coordinator', true)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
       RETURNING user_id
       `,
-      [firstName, lastName, email, hashedPassword, contactno]
+      [firstName, lastName, email, hashedPassword, contactno, invitedRole]
     );
-
-    // Add admin log
-
 
     const userId = userResult.rows[0].user_id;
 
+    // Assign role in user_has_roles
     await pgDatabase.query(
       `INSERT INTO user_has_roles (user_id, role_name) VALUES ($1, $2)`,
-      [userId, 'LSEED-Coordinator']
+      [userId, invitedRole]
     );
 
     // 5️⃣ Optionally: delete or mark invite as used
@@ -1197,42 +1136,45 @@ app.post("/signup-lseed-coordinator", async (req, res) => {
       [token]
     );
 
-    console.log(`✅ New LSEED-Coordinator registered: ${email}`);
+    console.log(`✅ New ${invitedRole} registered: ${email}`);
 
-    // Create Welcome to LSEED Insight Message to Coordinator
-    const notificationTitle = "Welcome to LSEED Insight!";
-    const notificationWelcomeMessage =
-      "As a LSEED-Coordinator, you can manage mentors, oversee social enterprises, and facilitate impactful connections that are involved in your assigned program. We're excited to have you on board. Get started by exploring your dashboard and other relevant pages!";
+    // 6️⃣ Welcome notification
+    const notificationTitle = `Welcome to LSEED Insight!`;
+    const notificationMessage = invitedRole === 'LSEED-Coordinator'
+      ? "As a LSEED-Coordinator, you can manage mentors, oversee social enterprises, and facilitate impactful connections involved in your assigned program. We're excited to have you on board."
+      : "As a LSEED-Director, you will oversee programs and manage platform-wide operations. Welcome to the LSEED platform!";
+
+    const targetRoute = invitedRole === 'LSEED-Coordinator' ? '/dashboard/lseed' : '/dashboard/director';
 
     await pgDatabase.query(
       `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route)
-      VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/dashboard/lseed');`,
-      [userId, notificationTitle, notificationWelcomeMessage]
-    )
+       VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), $4);`,
+      [userId, notificationTitle, notificationMessage, targetRoute]
+    );
 
-    // LSEED-Director notification
-    const lseedDirectors = await getLSEEDDirectors(); // change your function if needed
+    // 7️⃣ Notify LSEED Directors if a Coordinator just signed up
+    if (invitedRole === 'LSEED-Coordinator') {
+      const lseedDirectors = await getLSEEDDirectors(); // Your function to fetch directors
 
-    if (lseedDirectors && lseedDirectors.length > 0) {
-      const directorTitle = "LSEED-Coordinator Sign Up Successful!";
-      const coordinatorName = `${firstName} ${lastName}`;
-      const notificationDirectorMessage =
-        `LSEED-Coordinator ${coordinatorName} has successfully signed up and joined the system. You may now assign programs or monitor their activities via the Manage Programs Page.`;
+      if (lseedDirectors?.length) {
+        const coordinatorName = `${firstName} ${lastName}`;
+        const directorTitle = "LSEED-Coordinator Sign Up Successful!";
+        const directorMessage = `LSEED-Coordinator ${coordinatorName} has successfully signed up. You may now assign programs or monitor their activities via the Manage Programs page.`;
 
-      for (const director of lseedDirectors) {
-        const receiverId = director.user_id;
-
-        await pgDatabase.query(
-          `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route) 
-          VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/programs');`,
-          [receiverId, directorTitle, notificationDirectorMessage]
-        );
+        for (const director of lseedDirectors) {
+          await pgDatabase.query(
+            `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route) 
+             VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/programs');`,
+            [director.user_id, directorTitle, directorMessage]
+          );
+        }
       }
     }
-    res.status(201).json({ message: "Coordinator account created successfully." });
+
+    res.status(201).json({ message: `${invitedRole} account created successfully.` });
 
   } catch (err) {
-    console.error("❌ Error in /signup-LSEEDCoordinator:", err);
+    console.error("❌ Error in /signup-lseed-role:", err);
     res.status(500).json({ message: "Server error. Please try again." });
   }
 });
@@ -1240,229 +1182,238 @@ app.post("/signup-lseed-coordinator", async (req, res) => {
 app.post("/api/accept-mentor-application", async (req, res) => {
   const { applicationId } = req.body;
 
-  try {
-    // Start a transaction for atomicity
-    await pgDatabase.query('BEGIN');
+  const client = await pgDatabase.connect();
+  let emailToSend = null; // { firstName, email }
 
-    // 1. Get application
-    const result = await pgDatabase.query(
-      `SELECT * FROM mentor_form_application WHERE id = $1 FOR UPDATE`,
+  try {
+    await client.query("BEGIN");
+
+    // Atomic claim: only accept if still Pending
+    const claim = await client.query(
+      `UPDATE mentor_form_application
+       SET status = 'Approved'
+       WHERE id = $1 AND status = 'Pending'
+       RETURNING *;`,
       [applicationId]
     );
 
-    if (result.rowCount === 0) {
-      await pgDatabase.query('ROLLBACK');
-      return res.status(404).json({ message: "Application not found." });
+    if (claim.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: "Application already processed." });
     }
 
-    const app = result.rows[0];
+    const app = claim.rows[0];
 
-    // 2. Check if user email already exists
-    const existingUserResult = await pgDatabase.query(
+    // Check if user exists by email
+    const existRes = await client.query(
       `SELECT * FROM users WHERE email = $1`,
       [app.email]
     );
 
-    if (existingUserResult.rowCount > 0) {
-      const existingUser = existingUserResult.rows[0];
+    if (existRes.rowCount > 0) {
+      const u = existRes.rows[0];
 
-      // Check if they are an LSEED-Coordinator
-      const rolesResult = await pgDatabase.query(
-        `SELECT role_name FROM user_has_roles WHERE user_id = $1`,
-        [existingUser.user_id]
+      // Must be Coordinator per your rule
+      const r = await client.query(
+        `SELECT 1 FROM user_has_roles WHERE user_id=$1 AND role_name='LSEED-Coordinator'`,
+        [u.user_id]
       );
-
-      const roles = rolesResult.rows.map(r => r.role_name);
-      const isCoordinator = roles.includes('LSEED-Coordinator');
-
-      if (!isCoordinator) {
-        // ❌ User exists but is *not* a coordinator → reject
-        await pgDatabase.query('ROLLBACK');
-        return res.status(409).json({ message: "A user with this email already exists and is not a Coordinator." });
+      if (r.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: "A user with this email already exists and is not a Coordinator.",
+        });
       }
 
-      // ✅ User is Coordinator → add Mentor role
-      await pgDatabase.query(
-        `INSERT INTO user_has_roles (user_id, role_name) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [existingUser.user_id, 'Mentor']
+      // Grant Mentor idempotently
+      await client.query(
+        `INSERT INTO user_has_roles (user_id, role_name)
+         VALUES ($1,'Mentor')
+         ON CONFLICT (user_id, role_name) DO NOTHING`,
+        [u.user_id]
       );
 
-      // ✅ Insert into mentors table using existing user details + application areas
-      await pgDatabase.query(
+      // Create mentor profile
+      await client.query(
         `INSERT INTO mentors (
-          mentor_id,
-          mentor_firstname,
-          mentor_lastname,
-          email,
-          contactnum,
-          critical_areas,
-          preferred_mentoring_time,
-          accepted_application_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           mentor_id, mentor_firstname, mentor_lastname, email, contactnum,
+           critical_areas, preferred_mentoring_time, accepted_application_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [
-          existingUser.user_id,
-          existingUser.first_name,
-          existingUser.last_name,
-          existingUser.email,
-          existingUser.contactnum,
+          u.user_id,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.contactnum,
           app.business_areas,
           app.preferred_time,
-          applicationId
+          applicationId,
         ]
       );
 
-      // ✅ Update application status
-      await pgDatabase.query(
-        `UPDATE mentor_form_application SET status = 'Approved' WHERE id = $1`,
-        [applicationId]
+      // In-app notification INSIDE the txn
+      await client.query(
+        `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route)
+         VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/dashboard/mentor');`,
+        [
+          u.user_id,
+          "Mentor Access Granted",
+          "Your application to also serve as a mentor has been approved. You can now access mentor features.",
+        ]
       );
 
-      // Create Mentor Status Updated Notification
-      const notificationTitle = "Mentor Access Granted";
-      const notificationWelcomeMessage =
-        "Your application to also serve as a mentor has been approved. You can now use your account to access mentor features, connect with social enterprises, and support them through mentorship. Visit your dashboard to get started.";
+      emailToSend = { firstName: u.first_name, email: u.email };
+    } else {
+      // Create user as Mentor
+      const ins = await client.query(
+        `INSERT INTO users (first_name, last_name, email, password, contactnum, roles, isactive)
+         VALUES ($1,$2,$3,$4,$5,'Mentor', true)
+         RETURNING user_id, first_name, email`,
+        [app.first_name, app.last_name, app.email, app.password, app.contact_no]
+      );
+      const u = ins.rows[0];
 
-      await pgDatabase.query(
+      await client.query(
+        `INSERT INTO user_has_roles (user_id, role_name)
+         VALUES ($1,'Mentor')
+         ON CONFLICT (user_id, role_name) DO NOTHING`,
+        [u.user_id]
+      );
+
+      await client.query(
+        `INSERT INTO mentors (
+           mentor_id, mentor_firstname, mentor_lastname, email, contactnum,
+           critical_areas, preferred_mentoring_time, accepted_application_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          u.user_id,
+          app.first_name,
+          app.last_name,
+          app.email,
+          app.contact_no,
+          app.business_areas,
+          app.preferred_time,
+          applicationId,
+        ]
+      );
+
+      await client.query(
         `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route)
-        VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/dashboard/mentor');`,
-        [existingUser.user_id, notificationTitle, notificationWelcomeMessage]
-      )
+         VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/dashboard/mentor');`,
+        [
+          u.user_id,
+          "Welcome to LSEED Insight",
+          "Your mentor application was accepted. Explore your mentor dashboard to get started.",
+        ]
+      );
 
-      await pgDatabase.query('COMMIT');
+      emailToSend = { firstName: u.first_name, email: u.email };
+    }
 
-      const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
+    await client.query("COMMIT");
 
-      // ✉️ Send email
-      await transporter.sendMail({
+    // Send email AFTER COMMIT (kept in the same API handler as you prefer)
+    if (emailToSend) {
+      const loginUrl = process.env.WEBHOOK_BASE_URL;
+      await mailer.sendMail({
         from: `"LSEED Center" <${process.env.EMAIL_USER}>`,
-        to: existingUser.email,
+        to: emailToSend.email,
         subject: "Your LSEED Mentor Application Has Been Accepted",
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
-            <p style="margin: 0 0 16px;">Dear ${existingUser.first_name},</p>
-
+            <p style="margin: 0 0 16px;">Dear ${emailToSend.firstName},</p>
             <p style="margin: 0 0 16px;">
-              Your request to also serve as a mentor within the <strong>LSEED Center</strong> has been approved.
+              Congratulations! Your application to become a mentor at the <strong>LSEED Center</strong> has been accepted.
             </p>
-
             <p style="margin: 0 0 16px;">
-              Your account has now been granted mentor access. You may continue using your existing login credentials to access mentor features.
-              <a href="${process.env.WEBHOOK_BASE_URL}" style="color: #1E4D2B; text-decoration: underline;">Click here to Login</a>
+              You may now log in using your credentials.
+              <br/>
+              <a href="${loginUrl}" style="color: #1E4D2B; text-decoration: underline;">Click here to Login</a>
             </p>
-
-            <p style="margin: 0;">
-              Warm regards,<br/>
-              <strong>The LSEED Team</strong>
-            </p>
+            <p style="margin: 0;">Warm regards,<br/>The LSEED Team</p>
           </div>
-        `
+        `,
       });
-
-      return res.status(201).json({ message: "Mentor successfully added" });
     }
 
-    // 3. User doesn't exist → normal path, create user account
-    const userResult = await pgDatabase.query(
-      `INSERT INTO users (first_name, last_name, email, password, contactnum, roles, isactive)
-       VALUES ($1, $2, $3, $4, $5, 'Mentor', true)
-       RETURNING user_id`,
-      [app.first_name, app.last_name, app.email, app.password, app.contact_no]
-    );
-
-    const newUserId = userResult.rows[0].user_id;
-
-    await pgDatabase.query(
-      `INSERT INTO user_has_roles (user_id, role_name) VALUES ($1, $2)`,
-      [newUserId, 'Mentor']
-    );
-
-    await pgDatabase.query(
-      `INSERT INTO mentors (
-        mentor_id,
-        mentor_firstname,
-        mentor_lastname,
-        email,
-        contactnum,
-        critical_areas,
-        preferred_mentoring_time,
-        accepted_application_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        newUserId,
-        app.first_name,
-        app.last_name,
-        app.email,
-        app.contact_no,
-        app.business_areas,
-        app.preferred_time,
-        applicationId
-      ]
-    );
-
-    await pgDatabase.query(
-      `UPDATE mentor_form_application SET status = 'Approved' WHERE id = $1`,
-      [applicationId]
-    );
-
-    await pgDatabase.query('COMMIT');
-
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // ✉️ Send email
-    await transporter.sendMail({
-      from: `"LSEED Center" <${process.env.EMAIL_USER}>`,
-      to: app.email,
-      subject: "Your LSEED Mentor Application Has Been Accepted",
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
-          <p style="margin: 0 0 16px;">Dear ${app.first_name},</p>
-
-          <p style="margin: 0 0 16px;">
-            Congratulations! Your application to become a mentor at the <strong>LSEED Center</strong> has been accepted.
-          </p>
-
-          <p style="margin: 0 0 16px;">
-            You may now log in using the credentials you submitted during signup.
-            <br/>
-            <a href="${process.env.WEBHOOK_BASE_URL}" style="color: #1E4D2B; text-decoration: underline;">Click here to Login</a>
-          </p>
-
-          <p style="margin: 0;">
-            Warm regards,<br/>
-            The LSEED Team
-          </p>
-        </div>
-      `
-    });
-
-    // Create Notification
-    // Create Welcome Message
-    const notificationTitle = "Welcome to LSEED Insight";
-    const notificationWelcomeMessage =
-      "As a mentor at the LSEED Center, you can support social enterprises by sharing your expertise and guidance. We're excited to have you on board! Explore your dashboard to evaluate social enterprises, schedule mentoring sessions, and make an impact.";
-
-    await pgDatabase.query(
-      `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route)
-      VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/dashboard/mentor');`,
-      [newUserId, notificationTitle, notificationWelcomeMessage]
-    )
     return res.status(201).json({ message: "Mentor successfully added" });
   } catch (err) {
-    await pgDatabase.query('ROLLBACK');
+    try { await client.query("ROLLBACK"); } catch {}
     console.error("❌ Error processing mentor application:", err);
-    res.status(500).json({ message: "Failed to create mentor account." });
+
+    // Unique violation (e.g., mentors.accepted_application_id) -> someone else already processed
+    if (err && err.code === "23505") {
+      return res.status(409).json({ message: "Application already processed." });
+    }
+
+    return res.status(500).json({ message: "Failed to create mentor account." });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/decline-mentor-application", async (req, res) => {
+  const { applicationId } = req.body;
+
+  const client = await pgDatabase.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Atomically set to Declined ONLY if still Pending
+    // This prevents two admins from both declining/approving the same record
+    const claim = await client.query(
+      `
+      UPDATE mentor_form_application
+      SET status = 'Declined'
+      WHERE id = $1 AND status = 'Pending'
+      RETURNING first_name, email;
+      `,
+      [applicationId] // ✅ use applicationId, not id
+    );
+
+    if (claim.rowCount === 0) {
+      await client.query("ROLLBACK");
+      // Either not found or already processed by someone else
+      return res.status(409).json({ message: "Application already processed." });
+    }
+
+    const { first_name, email } = claim.rows[0];
+
+    // If you have an internal user account linked to this application,
+    // insert an in-app notification here INSIDE the transaction.
+
+    await client.query("COMMIT");
+
+    // Send email AFTER commit so you never email on rollback
+    const subject = "Your LSEED Mentor Application Status";
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
+        <p style="margin: 0 0 16px;">Dear ${first_name},</p>
+        <p style="margin: 0 0 16px;">
+          Thank you for your interest in becoming a mentor at the <strong>LSEED Center</strong>.
+        </p>
+        <p style="margin: 0 0 16px;">
+          After careful consideration, we regret to inform you that your application has not been approved at this time.
+        </p>
+        <p style="margin: 0;">We encourage you to stay connected and consider applying again in the future.</p>
+        <p style="margin: 0;">Warm regards,<br/>The LSEED Team</p>
+      </div>
+    `;
+
+    await mailer.sendMail({
+      from: `"LSEED Center" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject,
+      html,
+    });
+
+    return res.status(200).json({ message: "Application declined and email sent." });
+  } catch (err) {
+    try { await client.query("ROLLBACK"); } catch {}
+    console.error("❌ Error declining application:", err);
+    return res.status(500).json({ message: "Failed to decline application." });
+  } finally {
+    client.release();
   }
 });
 
@@ -1549,17 +1500,18 @@ app.get("/api/get-audit-logs", async (req, res) => {
   }
 });
 
-app.post("/api/invite-coordinator", async (req, res) => {
+app.post("/api/invite-lseed-user", async (req, res) => {
   const { email } = req.body;
   const ipAddress = (req.headers['x-forwarded-for'] || req.connection.remoteAddress || '').split(',')[0].trim();
   const userId = req.session.user?.id;
+  const activeRole = req.session.user?.activeRole;
 
   if (!email) {
     return res.status(400).json({ message: 'Email is required.' });
   }
 
   try {
-    // 1. Optional: check if the email already belongs to an existing user
+    // 1. Check if the email already belongs to an existing user
     const existingUser = await pgDatabase.query(
       'SELECT * FROM users WHERE email = $1',
       [email]
@@ -1569,17 +1521,49 @@ app.post("/api/invite-coordinator", async (req, res) => {
       return res.status(409).json({ message: 'A user with this email already exists.' });
     }
 
-    // 3. Store in DB
+    // 2. Generate invite token
+    const inviteToken = crypto.randomUUID();
+
+    // 3. Determine role to be assigned on signup
+    const inviteeRole = activeRole === "Administrator" ? "LSEED-Director" : "LSEED-Coordinator";
+
+    // 4. Store in DB
     await pgDatabase.query(
-      'INSERT INTO coordinator_invites (email, token) VALUES ($1, $2)',
-      [email, inviteToken]
+      'INSERT INTO coordinator_invites (email, token, role) VALUES ($1, $2, $3)',
+      [email, inviteToken, inviteeRole]
     );
 
-    // 4. Prepare sign-up page link with token
-    const signUpLink = `${process.env.WEBHOOK_BASE_URL}/coordinator-signup?token=${inviteToken}`;
+    // 5. Prepare sign-up page link
+    const signUpLink = `${process.env.WEBHOOK_BASE_URL}/lseed-signup?token=${inviteToken}`;
     console.log('✅ Sign-up link:', signUpLink);
 
-    // 5. Send the invitation email
+    // 6. Determine who the invite is "from"
+    const invitedBy = activeRole === "Administrator" ? "LSEED Admin Team" : "LSEED Director";
+
+    // 7. Compose email
+    const emailHTML = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
+        <p style="margin: 0 0 16px;">Dear ${inviteeRole},</p>
+
+        <p style="margin: 0 0 16px;">
+          The <strong>${invitedBy}</strong> has invited you to join as a <strong>${inviteeRole}</strong> on the <strong>LSEED platform</strong>.
+        </p>
+
+        <p style="margin: 0 0 16px;">
+          Please click the link below to set up your account:
+        </p>
+
+        <p style="margin: 0 0 16px;">
+          <a href="${signUpLink}" style="color: #1a73e8;">${signUpLink}</a>
+        </p>
+
+        <p style="margin: 0;">
+          <em>This link will expire in 24 hours.</em>
+        </p>
+      </div>
+    `;
+
+    // 8. Send email
     const transporter = nodemailer.createTransport({
       service: 'Gmail',
       auth: {
@@ -1591,47 +1575,25 @@ app.post("/api/invite-coordinator", async (req, res) => {
     await transporter.sendMail({
       from: `"LSEED Support" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'You have been invited to join LSEED as a Coordinator',
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
-          <p style="margin: 0 0 16px;">Hi,</p>
-
-          <p style="margin: 0 0 16px;">
-            The <strong>LSEED Director</strong> has invited you to join as a Coordinator on the <strong>LSEED platform</strong>.
-          </p>
-
-          <p style="margin: 0 0 16px;">
-            Click the link below to set up your account:
-          </p>
-
-          <p style="margin: 0 0 16px;">
-            <a href="${signUpLink}" style="color: #1a73e8;">${signUpLink}</a>
-          </p>
-
-          <p style="margin: 0;">
-            This link will expire in 24 hours.
-          </p>
-        </div>
-      `,
+      subject: `You're invited to join LSEED as a ${inviteeRole}`,
+      html: emailHTML,
     });
 
-    // Add Admin log
+    // 9. Audit log
     await pgDatabase.query(
       `INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
-      [userId, 'Invited LSEED-Coordinator to create account', JSON.stringify({ invited_email: email }), ipAddress]
+      [userId, `Invited ${inviteeRole} to create account`, JSON.stringify({ invited_email: email }), ipAddress]
     );
-
-    console.log('Audit Log Insert Debug:', { userId, email, ipAddress });
 
     res.status(201).json({ message: 'Invitation email sent successfully.' });
 
   } catch (err) {
-    console.error('❌ Error inviting coordinator:', err);
+    console.error('❌ Error inviting user:', err);
     res.status(500).json({ message: 'Something went wrong.' });
   }
 });
 
-app.get('/validate-invite-token', async (req, res) => {
+app.get('/api/validate-invite-token', async (req, res) => {
   const { token } = req.query;
 
   if (!token) {
@@ -1710,7 +1672,7 @@ app.get("/api/pending-schedules", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
+//TODO change query
 app.get("/api/flagged-ses", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
@@ -2051,6 +2013,143 @@ app.get('/api/check-mentor-application-status', async (req, res) => {
 });
 // SUBA PARTS ABOVE
 
+app.post("/api/mentorship/insert-collaboration", async (req, res) => {
+  try {
+    const { collaboration_request_details } = req.body;
+
+    // Extract SE IDs from collaboration_card_id
+    const cardId = collaboration_request_details.collaboration_card_id;
+
+    const match = cardId.match(
+      /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/
+    );
+
+    const seeking_collaboration_se_id = match[1];
+    const suggested_collaboration_se_id = match[2];
+
+    // Insert the collaboration request
+    const mentorDetails = await getMentorBySEID(seeking_collaboration_se_id);
+
+    const suggested_mentorship = await getMentorBySEID(suggested_collaboration_se_id)
+
+    // Insert the collaboration request
+    await insertCollaboration(collaboration_request_details, mentorDetails.mentorship_id, suggested_mentorship.mentorship_id);
+
+    // 🔔 Send notification to the suggested mentor
+    const seekingMentorName = collaboration_request_details.seeking_collaboration_mentor_name;
+    const suggestedMentorName = collaboration_request_details.suggested_collaboration_mentor_name;
+    const seName = collaboration_request_details.seeking_collaboration_se_name;
+
+    const notificationTitle = `Collaboration Accepted for ${seName}`;
+    const notificationMessage = `${suggestedMentorName} has accepted collaborating with your mentorship SE, ${seekingMentorName}.`;
+    //TODO: Fixx query for notification following ACID 
+    await pgDatabase.query(
+      `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route)
+       VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/collaboration-dashboard');`,
+      [mentorDetails.mentor_id, notificationTitle, notificationMessage]
+    );
+
+    res.status(200).json({ message: "Collaboration request submitted and notification sent." });
+  } catch (error) {
+    console.error("Error inserting collaboration:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.post("/api/mentorship/request-collaboration", async (req, res) => {
+  try {
+    const { collaboration_request_details } = req.body;
+
+    // Insert the collaboration request
+    await requestCollaborationInsert(collaboration_request_details);
+
+    // 🔔 Send notification to the suggested mentor
+    const suggestedMentorId = collaboration_request_details.suggested_collaboration_mentor_id;
+    const seekingMentorName = collaboration_request_details.seeking_collaboration_mentor_name;
+    const seName = collaboration_request_details.seeking_collaboration_se_name;
+
+    const notificationTitle = "New Collaboration Request Received";
+    const notificationMessage = `${seekingMentorName} has requested a collaboration, under their mentorship with ${seName}.`;
+
+    await pgDatabase.query(
+      `INSERT INTO notification (notification_id, receiver_id, title, message, created_at, target_route)
+       VALUES (uuid_generate_v4(), $1, $2, $3, NOW(), '/collaboration-dashboard');`,
+      [suggestedMentorId, notificationTitle, notificationMessage]
+    );
+
+    res.status(201).json({ message: "Collaboration request submitted and notification sent." });
+  } catch (error) {
+    console.error("Error requesting collaboration:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/mentorship/suggested-collaborations/:mentorship_id", async (req, res) => {
+  try {
+    const userId = req.session.user?.id; // Safely extract from session
+    const mentorship_id = req.params.mentorship_id
+
+    const collaborationStats = await getSuggestedCollaborations(userId, mentorship_id);
+
+    res.json(collaborationStats);
+  } catch (error) {
+    console.error("Error fetching collaboration stats:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/mentorship/get-collaborations", async (req, res) => {
+  try {
+    const userId = req.session.user?.id; // Safely extract from session
+
+    const collaborations = await getExistingCollaborations(userId);
+
+    res.json(collaborations);
+  } catch (error) {
+    console.error("Error fetching collaborators:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/mentorship/get-collaboration-requests", async (req, res) => {
+  try {
+    const userId = req.session.user?.id; // Safely extract from session
+
+    const collaborationRequests = await getCollaborationRequests(userId);
+
+    res.json(collaborationRequests);
+  } catch (error) {
+    console.error("Error fetching collaborators:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/mentorship/view-collaboration-request/:mentorship_collaboration_request_id", async (req, res) => {
+  try {
+    const mentorship_collaboration_request_id = req.params.mentorship_collaboration_request_id
+
+    const viewCollabDetails = await getCollaborationRequestDetails(mentorship_collaboration_request_id);
+
+    res.json(viewCollabDetails);
+  } catch (error) {
+    console.error("Error fetching collaborators:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/mentorship/get-collaborators", async (req, res) => {
+  try {
+    const userId = req.session.user?.id; // Safely extract from session
+
+    const collaborators = await getCollaborators(userId);
+
+    res.json(collaborators);
+  } catch (error) {
+    console.error("Error fetching collaborators:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 // DIEGO PARTS BELOW CHECK
 app.get("/api/get-programs", async (req, res) => {
   try {
@@ -2135,7 +2234,7 @@ app.get("/api/userDetails", (req, res) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 });
-
+//DOUBLE CHECK IF NEED
 app.put("/api/admin/users/:id", async (req, res) => {
   const { id } = req.params;
   const updatedUser = req.body;
@@ -2161,7 +2260,7 @@ app.put("/api/admin/users/:id", async (req, res) => {
   }
 });
 // DIEGO PARTS ABOVE
-app.get("/api/getAllSocialEnterprisesWithMentorship", async (req, res) => {
+app.get("/api/get-all-social-enterprises-with-mentorship", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
@@ -2266,7 +2365,7 @@ app.get("/api/getAllSocialEnterprisesForComparison", async (req, res) => {
   }
 });
 
-app.get("/api/getMentorEvaluations", async (req, res) => {
+app.get("/api/get-mentor-evaluations", async (req, res) => {
   try {
     const mentor_id = req.session.user?.id;
 
@@ -2328,7 +2427,7 @@ app.post("/api/show-signup-password", async (req, res) => {
   }
 });
 
-app.get("/api/getRecentMentorEvaluations", async (req, res) => {
+app.get("/api/get-recent-mentor-evaluations", async (req, res) => {
   try {
     const mentor_id = req.session.user?.id; // Safely extract from session
 
@@ -2347,7 +2446,7 @@ app.get("/api/getRecentMentorEvaluations", async (req, res) => {
   }
 });
 
-app.get("/api/getUpcomingSchedulesForMentor", async (req, res) => {
+app.get("/api/get-upcoming-schedules-for-mentor", async (req, res) => {
   try {
     // DOUBLE CHECK
     const mentor_id = req.session.user?.id; // Safely extract from session
@@ -2410,7 +2509,7 @@ app.get("/api/get-Mentor-Evaluations-By-Mentor-ID", async (req, res) => {
   }
 });
 
-app.get("/api/get-All-Mentor-Evaluation-Type", async (req, res) => {
+app.get("/api/get-all-mentor-evaluation-type", async (req, res) => {
   try {
     const result = await getAllMentorTypeEvaluations() // Fetch SEs from DB
     if (!result || result.length === 0) {
@@ -2423,7 +2522,7 @@ app.get("/api/get-All-Mentor-Evaluation-Type", async (req, res) => {
   }
 });
 
-app.get("/api/get-Evaluation-Details", async (req, res) => {
+app.get("/api/get-evaluation-details", async (req, res) => {
   try {
     const { evaluation_id } = req.query; // Extract evaluation_id from query parameters
 
@@ -2460,7 +2559,7 @@ app.get("/api/check-Telegram-Registration", async (req, res) => {
   }
 });
 
-app.get("/api/get-Evaluation-Details-For-Mentor-Evaluation", async (req, res) => {
+app.get("/api/get-evaluation-details-for-mentor-evaluation", async (req, res) => {
   try {
     const { evaluation_id } = req.query; // Extract evaluation_id from query parameters
 
@@ -2569,6 +2668,1372 @@ app.get("/api/top-se-performance", async (req, res) => {
   } catch (error) {
     console.error("Error fetching top SE performance:", error);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+app.get("/api/overall-radar-data", async (req, res) => {
+  const client = await pgDatabase.connect();
+  try {
+    const query = `
+      SELECT 
+        category_name as category,
+        AVG(CAST(rating as DECIMAL)) as score
+      FROM evaluations e
+      JOIN evaluation_categories ect ON e.evaluation_id = ect.evaluation_id
+      GROUP BY category_name
+      ORDER BY category_name
+    `;
+
+    const result = await client.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching overall radar data:", error);
+    res.status(500).json({ message: "Failed to fetch overall radar data" });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/api/overall-category-stats", async (req, res) => {
+  const client = await pgDatabase.connect();
+  try {
+    const query = `
+      SELECT 
+        ect.category_name,
+        ect.rating,
+        COUNT(*) as rating_count,
+        AVG(CAST(ect.rating as DECIMAL)) as avg_rating
+      FROM evaluations e
+      JOIN evaluation_categories ect ON e.evaluation_id = ect.evaluation_id
+      GROUP BY ect.category_name, ect.rating
+      ORDER BY ect.category_name, ect.rating
+    `;
+
+    const result = await client.query(query);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching overall category stats:", error);
+    res.status(500).json({ message: "Failed to fetch overall category stats" });
+  } finally {
+    client.release();
+  }
+});
+
+// Main endpoint for generating overall evaluation report
+app.post("/api/overall-evaluation-report", async (req, res) => {
+  try {
+    const { chartImageRadar, overallCategoryStats, overallRadarData } = req.body;
+
+    if (!chartImageRadar) {
+      return res.status(400).json({ message: "Missing radar chart image" });
+    }
+
+    const imageBuffer = Buffer.from(chartImageRadar.split(",")[1], "base64");
+
+    const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 40 });
+
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=overall_evaluation_report.pdf`,
+      });
+      res.send(pdfBuffer);
+    });
+
+    // FIXED: Declare variables only once at the top
+    let estimatedTotalPages = 4; // Most reports will have 2-3 pages
+    let currentPageNumber = 1;   // Track current page number
+
+    // Helper function to add page number to current page
+    const addPageNumber = (pageNum, totalPages) => {
+      const pageWidth = doc.page.width;
+      const margin = doc.page.margins.top;
+
+      // Save current settings
+      const currentFontSize = doc._fontSize;
+
+      doc.fontSize(10)
+        .fillColor('gray')
+        .text(`Page ${pageNum} of ${totalPages}`,
+          pageWidth - 120, // From right edge
+          margin - 20,     // Above content area
+          { align: 'right', width: 100 });
+
+      // Restore settings
+      doc.fontSize(currentFontSize);
+      // No font restoration needed since we didn't change it
+    };
+
+    // ─── PAGE 1: TITLE AND OVERVIEW ───
+
+    // ─── Title Section ───
+    doc.fontSize(20).text("Overall Social Enterprise Evaluation Report", { align: "center" });
+    doc.fontSize(12);
+
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    doc.text(`Generated as of ${formattedDate}`, { align: "left" });
+
+    // Column positions
+    const leftColX = 40;
+    const rightColX = 350;
+    const sectionTopY = 80;
+    let leftY = sectionTopY;
+    let rightY = sectionTopY;
+
+    // Left Column - Summary Stats
+    // FIXED: Calculate total evaluations correctly
+    // Group by category first, then sum ratings within each category to get evaluations per category
+    const categoryGroups = {};
+    overallCategoryStats.forEach(stat => {
+      if (!categoryGroups[stat.category_name]) {
+        categoryGroups[stat.category_name] = 0;
+      }
+      categoryGroups[stat.category_name] += parseInt(stat.rating_count);
+    });
+
+    // Total evaluations should be the count from any one category (they should all be the same)
+    // Or if you want to be extra safe, take the average or first category
+    const totalEvaluations = Object.values(categoryGroups)[0] || 0;
+
+    // Alternative approach if categories might have different counts:
+    // const totalEvaluations = Math.max(...Object.values(categoryGroups));
+
+    // Ensure scores are numbers before calculating average
+    const validScores = overallRadarData.filter(cat => cat.score !== undefined && cat.score !== null);
+    const overallAverage = validScores.length > 0 ?
+      validScores.reduce((sum, cat) => sum + (typeof cat.score === 'number' ? cat.score : parseFloat(cat.score) || 0), 0) / validScores.length : 0;
+
+    doc.text(`Overall Average Score: ${overallAverage.toFixed(2)}`, leftColX, leftY);
+    leftY += 16;
+    doc.text(`Total Evaluations: ${totalEvaluations}`, leftColX, leftY);
+
+    // Move below taller column
+    doc.y = Math.max(leftY, rightY) + 20;
+
+    // ─── Analytics Section ───
+    doc.fontSize(16).text("Analytics Summary", { underline: true });
+    doc.moveDown(0.5);
+
+    doc.fontSize(14).text("Performance Overview Across All Social Enterprises");
+    doc.moveDown(0.5);
+    doc.image(imageBuffer, { fit: [700, 180], align: "center" });
+    doc.moveDown(1);
+
+    // ─── Bottom Section: 2-Column Layout (similar to ad-hoc report) ───
+    const startY = doc.y;
+    const boxWidth = 250;
+    const boxHeight = 45;
+    const boxSpacingY = 10;
+    const col1X = 40;
+    const col2X = col1X + boxWidth + 20;
+    const boxesPerColumn = 3;
+
+    overallRadarData.slice(0, 6).forEach((item, index) => {
+      const col = Math.floor(index / boxesPerColumn);
+      const row = index % boxesPerColumn;
+      const x = col === 0 ? col1X : col2X;
+      const y = startY + row * (boxHeight + boxSpacingY);
+
+      // Ensure score is a number and handle potential undefined/null values
+      const score = typeof item.score === 'number' ? item.score : parseFloat(item.score) || 0;
+
+      doc.rect(x, y, boxWidth, boxHeight).stroke();
+      doc.fontSize(9)
+        .text(`Category: ${item.category}`, x + 10, y + 10)
+        .text(`Score: ${score.toFixed(2)}`, x + 10, y + 25);
+    });
+
+    // Insights Section (similar to ad-hoc report)
+    const strengths = overallRadarData.filter(r => {
+      const score = typeof r.score === 'number' ? r.score : parseFloat(r.score) || 0;
+      return score > 3;
+    }).map(r => r.category);
+
+    const weaknesses = overallRadarData.filter(r => {
+      const score = typeof r.score === 'number' ? r.score : parseFloat(r.score) || 0;
+      return score <= 3;
+    }).map(r => r.category);
+    const insightX = col2X + boxWidth + 40;
+    let insightY = startY;
+
+    doc.fontSize(12).text("Overall Insights", insightX, insightY);
+    insightY += 20;
+
+    doc.fontSize(10).text("Program Strengths:", insightX, insightY);
+    insightY += 15;
+    if (strengths.length > 0) {
+      strengths.forEach((s) => {
+        doc.text(`• ${s}`, insightX + 10, insightY);
+        insightY += 14;
+      });
+    } else {
+      doc.text("• All areas need improvement", insightX + 10, insightY);
+      insightY += 14;
+    }
+
+    insightY += 10;
+    doc.text("Areas for Improvement:", insightX, insightY);
+    insightY += 15;
+    if (weaknesses.length > 0) {
+      weaknesses.forEach((w) => {
+        doc.text(`• ${w}`, insightX + 10, insightY);
+        insightY += 14;
+      });
+    } else {
+      doc.text("• All areas performing well", insightX + 10, insightY);
+    }
+
+    // Add page number to first page
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 2: DETAILED INSIGHTS (Enhanced version) ───
+    doc.addPage();
+    currentPageNumber++; // FIXED: Increment instead of setting to 2
+
+    const page2AxisX = 40;
+    const page2AxisY = doc.y;
+    const page2MaxWidth = 520;
+    const page2GapY = 15;
+
+    doc.fontSize(16).text("Detailed Category Analysis & Recommendations", page2AxisX, page2AxisY, { underline: true });
+    doc.moveDown(1);
+    doc.fontSize(10);
+    let currentPage2Y = doc.y + 10;
+
+    // REMOVED: Duplicate variable declarations that were causing errors
+
+    // Category advice map (enhanced)
+    const categoryAdviceMap = {
+      "Marketing Plan/Execution": {
+        belowTwo: "Immediate action required: Organize intensive marketing workshops covering digital marketing, branding basics, and customer acquisition strategies. Consider pairing SEs with marketing mentors.",
+        twoToThree: "Schedule regular marketing mentoring sessions focusing on campaign planning, social media strategy, and market research techniques.",
+        aboveThree: "Maintain momentum with advanced marketing workshops on analytics, conversion optimization, and scaling strategies."
+      },
+      "Teamwork": {
+        belowTwo: "Critical intervention needed: Conduct team-building workshops, establish communication protocols, and implement peer accountability systems. Consider leadership training for SE founders.",
+        twoToThree: "Organize collaborative activities and communication skills training. Introduce project management tools to improve coordination.",
+        aboveThree: "Continue fostering collaboration through peer mentoring programs and cross-SE knowledge sharing sessions."
+      },
+      "Logistics": {
+        belowTwo: "Urgent logistics training required: Cover supply chain basics, inventory management, and operational workflow design. Provide templates for logistics planning.",
+        twoToThree: "Offer intermediate logistics mentoring focusing on process optimization and efficiency improvements.",
+        aboveThree: "Focus on advanced logistics strategies including scaling operations and technology integration."
+      },
+      "Financial Planning/Management": {
+        belowTwo: "Immediate financial literacy intervention: Provide basic accounting training, budgeting workshops, and financial reporting templates. Assign financial mentors to struggling SEs.",
+        twoToThree: "Continue financial mentoring with focus on cash flow management, financial forecasting, and investment planning.",
+        aboveThree: "Advance to sophisticated financial strategies including funding acquisition and financial risk management."
+      },
+      "Product/Service Design/Planning": {
+        belowTwo: "Product development bootcamp needed: Cover user research, design thinking, and MVP development. Provide product planning frameworks and templates.",
+        twoToThree: "Regular product mentoring sessions focusing on iterative design, user feedback integration, and market validation.",
+        aboveThree: "Advanced product strategy workshops covering innovation, competitive analysis, and product scaling."
+      },
+      "Human Resource Management": {
+        belowTwo: "HR fundamentals training required: Cover recruitment basics, team structure planning, and basic HR policies. Provide HR documentation templates.",
+        twoToThree: "Intermediate HR mentoring focusing on team development, performance management, and organizational culture.",
+        aboveThree: "Advanced HR strategy sessions covering talent retention, leadership development, and scaling HR practices."
+      }
+    };
+
+    // Process category statistics - REUSING the categoryGroups we already calculated
+    // Generate insights for each category (similar to ad-hoc report style)
+    for (const [category, totalCount] of Object.entries(categoryGroups)) {
+      // Get ratings breakdown for this category
+      const categoryStats = overallCategoryStats.filter(stat => stat.category_name === category);
+      const ratings = {};
+      categoryStats.forEach(stat => {
+        ratings[stat.rating] = parseInt(stat.rating_count);
+      });
+
+      const total = totalCount;
+      const weighted = Object.entries(ratings).reduce(
+        (acc, [r, c]) => acc + parseInt(r) * c,
+        0
+      );
+      const average = total > 0 ? (weighted / total).toFixed(2) : "0.00";
+
+      const score1 = ratings[1] || 0;
+      const score2 = ratings[2] || 0;
+      const score3 = ratings[3] || 0;
+      const score4 = ratings[4] || 0;
+      const score5 = ratings[5] || 0;
+
+      // Determine key remark (similar to ad-hoc report logic)
+      let remark = "";
+      if (average >= 4 && score4 + score5 >= total * 0.7) {
+        remark = "Strong performance across all SEs with most evaluators awarding high marks. The program demonstrates confidence and consistency in this area.";
+      } else if (average >= 4) {
+        remark = "Generally strong area across SEs, though some ratings suggest opportunities to reach excellence with more consistency.";
+      } else if (average >= 3) {
+        if (score1 + score2 >= total * 0.3) {
+          remark = "Mixed performance across SEs. While some scores are favorable, a notable proportion of low ratings suggests deeper inconsistencies in the program.";
+        } else {
+          remark = "Moderate strength across SEs. There is foundational capability here, but enhancements could help reach best-in-class execution.";
+        }
+      } else if (average <= 2) {
+        remark = "This category is underperforming across all SEs. A high concentration of low scores indicates a need for structured program-wide support and attention.";
+      } else {
+        remark = "Inconsistent performance across SEs. Low and mid-tier ratings dominate—suggests unclear processes or insufficient capability development.";
+      }
+
+      // Get appropriate advice
+      let advice = "";
+      if (average < 2) {
+        advice = categoryAdviceMap[category]?.belowTwo || "Urgent program-wide intervention needed.";
+      } else if (average < 3) {
+        advice = categoryAdviceMap[category]?.twoToThree || "Regular mentoring sessions recommended.";
+      } else {
+        advice = categoryAdviceMap[category]?.aboveThree || "Maintain current strategies and consider advanced training.";
+      }
+
+      // Combine and format the insight block (similar to ad-hoc report)
+      const title = `${category}`;
+      const avgLine = `Program Average Score: ${average} / 5`;
+      const distributionLine = `Distribution: 1(${score1}) 2(${score2}) 3(${score3}) 4(${score4}) 5(${score5})`;
+      const fullInsight = `${remark} ${advice}`;
+
+      const titleHeight = doc.heightOfString(title, { width: page2MaxWidth });
+      const avgLineHeight = doc.heightOfString(avgLine, { width: page2MaxWidth });
+      const distributionHeight = doc.heightOfString(distributionLine, { width: page2MaxWidth });
+      const fullInsightHeight = doc.heightOfString(fullInsight, { width: page2MaxWidth });
+
+      const totalHeight = titleHeight + avgLineHeight + distributionHeight + fullInsightHeight + page2GapY * 2;
+
+      // Add new page if needed
+      const pageHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom;
+      if (currentPage2Y + totalHeight > pageHeight) {
+        // Add page number to current page before creating new page
+        addPageNumber(currentPageNumber, estimatedTotalPages);
+
+        doc.addPage();
+        currentPageNumber++;
+        currentPage2Y = doc.y;
+      }
+
+      // Render (similar to ad-hoc report formatting)
+      doc.font("Helvetica-Bold").text(title, page2AxisX, currentPage2Y, { width: page2MaxWidth });
+      currentPage2Y += titleHeight;
+
+      doc.font("Helvetica-Bold").text(avgLine, page2AxisX, currentPage2Y, { width: page2MaxWidth });
+      currentPage2Y += avgLineHeight;
+
+      doc.font("Helvetica").text(distributionLine, page2AxisX, currentPage2Y, { width: page2MaxWidth });
+      currentPage2Y += distributionHeight + 5;
+
+      doc.font("Helvetica").text(fullInsight, page2AxisX, currentPage2Y, {
+        width: page2MaxWidth,
+        lineGap: 2,
+      });
+      currentPage2Y += fullInsightHeight + page2GapY;
+    }
+
+    // Add overall program recommendations
+
+
+    doc.fontSize(14).font("Helvetica-Bold").text("Overall Program Recommendations", page2AxisX, currentPage2Y, { underline: true });
+    currentPage2Y += 25;
+    doc.fontSize(10).font("Helvetica");
+
+    if (overallAverage < 2.5) {
+      doc.text("• Implement comprehensive mentoring program across all categories", page2AxisX, currentPage2Y);
+      currentPage2Y += 14;
+      doc.text("• Increase frequency of training workshops and support sessions", page2AxisX, currentPage2Y);
+      currentPage2Y += 14;
+      doc.text("• Consider additional resources and dedicated support staff", page2AxisX, currentPage2Y);
+    } else if (overallAverage < 3.5) {
+      doc.text("• Continue current mentoring efforts with targeted improvements", page2AxisX, currentPage2Y);
+      currentPage2Y += 14;
+      doc.text("• Focus resources on weakest performing categories", page2AxisX, currentPage2Y);
+      currentPage2Y += 14;
+      doc.text("• Implement peer learning initiatives between high and low performers", page2AxisX, currentPage2Y);
+    } else {
+      doc.text("• Program is performing well overall - maintain current quality", page2AxisX, currentPage2Y);
+      currentPage2Y += 14;
+      doc.text("• Focus on scaling successful practices to all participating SEs", page2AxisX, currentPage2Y);
+      currentPage2Y += 14;
+      doc.text("• Consider advanced training modules for high-performing SEs", page2AxisX, currentPage2Y);
+    }
+
+    // FIXED: Add page number to final page with proper total count
+    // Update the estimated total pages to actual current page count
+    estimatedTotalPages = 4;
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // After adding overall program recommendations and before adding final page number:
+    doc.addPage();
+    currentPageNumber++;
+
+    doc.fontSize(16).font("Helvetica-Bold")
+      .text("List of Social Enterprises with Evaluations", 40, doc.y, { underline: true });
+    doc.moveDown(1);
+    doc.fontSize(10).font("Helvetica");
+
+    // ✅ Fetch social enterprises from DB that have evaluations
+    const client = await pgDatabase.connect();
+    let socialEnterprisesWithEvaluations = [];
+    try {
+      const seQuery = `
+    SELECT DISTINCT se.team_name
+    FROM socialenterprises se
+    JOIN evaluations e ON se.se_id = e.se_id
+    ORDER BY se.team_name;
+  `;
+      const result = await client.query(seQuery);
+      socialEnterprisesWithEvaluations = result.rows;
+    } catch (dbErr) {
+      console.error("❌ Error fetching social enterprises for report:", dbErr);
+    } finally {
+      client.release();
+    }
+
+    // ✅ Render the list
+    if (socialEnterprisesWithEvaluations.length > 0) {
+      let listY = doc.y;
+      socialEnterprisesWithEvaluations.forEach((se, index) => {
+        // Add new page if needed
+        if (listY > doc.page.height - doc.page.margins.bottom - 20) {
+          addPageNumber(currentPageNumber, estimatedTotalPages);
+          doc.addPage();
+          currentPageNumber++;
+          listY = doc.y;
+        }
+        doc.text(`${index + 1}. ${se.team_name}`, 50, listY, { width: 700 });
+        listY += 14;
+      });
+    } else {
+      doc.text("No social enterprises with evaluations found.", 50, doc.y);
+    }
+
+    // ✅ Update total pages count and add page number
+    estimatedTotalPages = currentPageNumber;
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+
+    doc.end();
+  } catch (err) {
+    console.error("❌ Error generating overall evaluation report:", err);
+    res.status(500).json({ message: "Failed to generate PDF" });
+  }
+});
+
+// Updated Adhoc Report Route (Evaluation Report)
+app.post("/api/adhoc-report", async (req, res) => {
+  try {
+    const { chartImageRadar, chartImagePie, se_id, period, scoreDistributionLikert } = req.body;
+    if (!chartImageRadar || !chartImagePie || !scoreDistributionLikert) {
+      return res.status(400).json({ message: "Missing chart image(s)" });
+    }
+
+    const imageBuffer = Buffer.from(chartImageRadar.split(",")[1], "base64");
+    const pieBuffer = Buffer.from(chartImagePie.split(",")[1], "base64");
+    const likertBuffer = Buffer.from(scoreDistributionLikert.split(",")[1], "base64");
+
+    const performanceOverviewResult = await getPerformanceOverviewBySEID(se_id);
+    const avgEvaluationScore = await avgRatingPerSE(se_id);
+    const numberOfEvaluations = await getTotalEvaluationCount(se_id);
+    const socialEnterpriseDetails = await getSocialEnterpriseByID(se_id)
+
+    const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 40 });
+
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=adhoc_report.pdf`,
+      });
+      res.send(pdfBuffer);
+    });
+
+    // Declare variables for page numbering
+    let estimatedTotalPages = 4;
+    let currentPageNumber = 1;
+
+    // Helper function to add page number to current page
+    const addPageNumber = (pageNum, totalPages) => {
+      const pageWidth = doc.page.width;
+      const margin = doc.page.margins.top;
+
+      const currentFontSize = doc._fontSize;
+
+      doc.fontSize(10)
+        .fillColor('black') // Changed from gray to black
+        .text(`Page ${pageNum} of ${totalPages}`,
+          pageWidth - 120,
+          margin - 20,
+          { align: 'right', width: 100 });
+
+      doc.fontSize(currentFontSize);
+      doc.fillColor('black');
+    };
+
+    // ─── PAGE 1: TITLE AND OVERVIEW ───
+
+    // Title Section
+    doc.fontSize(20).fillColor('black').text(`${socialEnterpriseDetails.team_name} Analytics Report`, { align: "center" });
+    doc.fontSize(12);
+
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    doc.fillColor('black').text(`Generated as of ${formattedDate}`, { align: "left" });
+
+    // Column positions
+    const leftColX = 40;
+    const rightColX = 350;
+    const sectionTopY = 80;
+    let leftY = sectionTopY;
+    let rightY = sectionTopY;
+
+    // Left Column
+    doc.fillColor('black').text(`Average Evaluation Score: ${avgEvaluationScore[0]?.avg_rating || "N/A"}`, leftColX, leftY);
+    leftY += 16;
+    doc.fillColor('black').text(`Number of Evaluations: ${numberOfEvaluations[0]?.total_evaluations || "N/A"}`, leftColX, leftY);
+
+    // Move below taller column
+    doc.y = Math.max(leftY, rightY) + 20;
+
+    // Analytics Section
+    doc.fontSize(16).fillColor('black').text("Analytics Summary", { underline: true });
+    doc.moveDown(0.5);
+
+    doc.fontSize(14).fillColor('black').text("Performance Overview");
+    doc.moveDown(0.5);
+    doc.image(imageBuffer, { fit: [700, 180], align: "center" });
+    doc.moveDown(1);
+
+    // Bottom Section: 2-Column Layout
+    const startY = doc.y;
+    const boxWidth = 250;
+    const boxHeight = 45;
+    const boxSpacingY = 10;
+    const col1X = 40;
+    const col2X = col1X + boxWidth + 20;
+    const boxesPerColumn = 3;
+
+    performanceOverviewResult.slice(0, 6).forEach((item, index) => {
+      const col = Math.floor(index / boxesPerColumn);
+      const row = index % boxesPerColumn;
+      const x = col === 0 ? col1X : col2X;
+      const y = startY + row * (boxHeight + boxSpacingY);
+
+      doc.rect(x, y, boxWidth, boxHeight).strokeColor('black').stroke(); // Changed stroke color to black
+      doc.fontSize(9).fillColor('black') // Changed text color to black
+        .text(`Category: ${item.category}`, x + 10, y + 10)
+        .text(`Score: ${item.score}`, x + 10, y + 25);
+    });
+
+    // Insights Section
+    const strengths = performanceOverviewResult.filter(r => r.score > 3).map(r => r.category);
+    const weaknesses = performanceOverviewResult.filter(r => r.score <= 3).map(r => r.category);
+    const insightX = col2X + boxWidth + 40;
+    let insightY = startY;
+
+    doc.fontSize(12).fillColor('black').text("Insights", insightX, insightY);
+    insightY += 20;
+
+    doc.fontSize(10).fillColor('black').text("Strengths:", insightX, insightY);
+    insightY += 15;
+    if (strengths.length > 0) {
+      strengths.forEach((s) => {
+        doc.fillColor('black').text(`• ${s}`, insightX + 10, insightY);
+        insightY += 14;
+      });
+    } else {
+      doc.fillColor('black').text("• None", insightX + 10, insightY);
+      insightY += 14;
+    }
+
+    insightY += 10;
+    doc.fillColor('black').text("Weaknesses:", insightX, insightY);
+    insightY += 15;
+    if (weaknesses.length > 0) {
+      weaknesses.forEach((w) => {
+        doc.fillColor('black').text(`• ${w}`, insightX + 10, insightY);
+        insightY += 14;
+      });
+    } else {
+      doc.fillColor('black').text("• None", insightX + 10, insightY);
+    }
+
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 2: RECURRING ISSUES ───
+    doc.addPage();
+    currentPageNumber++;
+
+    doc.fontSize(14).fillColor('black').text("Recurring Issues", { align: "left" });
+    doc.moveDown(1);
+    doc.image(pieBuffer, { fit: [700, 400], align: "center", valign: "top" });
+    doc.moveDown(2);
+
+    const commonChallenges = await getCommonChallengesBySEID(se_id);
+    const mainKeyPainPoint = commonChallenges.reduce((max, item) => {
+      const score = item.count * item.percentage;
+      const maxScore = max.count * max.percentage;
+      return score > maxScore ? item : max;
+    });
+
+    const startYPage2 = doc.y;
+    const leftX = 40;
+    const rightX = 400;
+    const boxSpacingYPage2 = 10;
+    const maxWidth = 320;
+
+    doc.fontSize(12).fillColor('black').text("Common Challenges", leftX, startYPage2, { underline: true });
+    doc.fillColor('black').text("Insights", rightX, startYPage2, { underline: true });
+
+    let leftYPage2 = startYPage2 + 20;
+    let rightYPage2 = startYPage2 + 20;
+    doc.fontSize(10);
+
+    for (const item of commonChallenges) {
+      const isMain = item.category === mainKeyPainPoint.category && item.comment === mainKeyPainPoint.comment;
+      const challengeText = `${item.percentage}% of recurring issues relate to ${item.category}, where evaluators cited "${item.comment}" in ${item.count} evaluations.`;
+
+      if (isMain) {
+        doc.font("Helvetica-Bold").fillColor("red").text("Main Key Pain Point", leftX, leftYPage2);
+        leftYPage2 += 14;
+        doc.font("Helvetica").fillColor("black");
+      }
+
+      doc.fillColor('black').text(challengeText, leftX, leftYPage2, {
+        width: maxWidth,
+        align: "left",
+        lineGap: 2,
+      });
+
+      const hLeft = doc.heightOfString(challengeText, { width: maxWidth });
+      leftYPage2 += hLeft + boxSpacingYPage2;
+
+      // Insight logic (keeping the existing logic)
+      const cat = item.category;
+      const comment = item.comment.toLowerCase();
+      let insight = "";
+
+      if (cat === "Teamwork") {
+        insight = comment.includes("not participating")
+          ? "Teamwork appears to be a key pain point, with many members not contributing. This suggests a need to foster collaboration and engagement."
+          : "Challenges in teamwork reflect gaps in group dynamics or morale—team-building may help.";
+      } else if (cat === "Financial Planning/Management") {
+        insight = comment.includes("no reports")
+          ? "Financial systems are underdeveloped. Foundational financial tracking and planning should be established."
+          : "Some financial efforts exist but remain incomplete—follow-through on reports and structured planning is needed.";
+      } else if (cat === "Marketing Plan/Execution") {
+        insight = comment.includes("no plans")
+          ? "Marketing strategy is lacking entirely. Guidance in planning and outreach is needed."
+          : "Marketing has started but lacks execution—support in turning ideas into action could be beneficial.";
+      } else if (cat === "Product/Service Design/Planning") {
+        insight = comment.includes("no reports")
+          ? "Product/Service planning is missing. Consider starting with basic reporting and design planning."
+          : "Initial product/service documentation exists but needs structure and completion.";
+      } else if (cat === "Human Resource Management") {
+        insight = comment.includes("no reports")
+          ? "HR processes are undeveloped—efforts should be made to draft plans and define HR practices."
+          : "There is some HR planning effort, but documentation is lacking—follow-through and organization are key.";
+      } else if (cat === "Logistics") {
+        insight = comment.includes("no plans")
+          ? "Logistics is a major issue, with a complete lack of plans—basic logistical mapping and coordination tools should be introduced."
+          : "Some logistics planning exists, but execution is weak—focus on implementing existing plans.";
+      } else {
+        insight = `The category "${cat}" shows notable underperformance—mentorship and structured planning are recommended.`;
+      }
+
+      if (isMain) doc.font("Helvetica-Bold").fillColor("red");
+      doc.text(insight, rightX, rightYPage2, {
+        width: maxWidth,
+        align: "left",
+        lineGap: 2,
+      });
+      const hRight = doc.heightOfString(insight, { width: maxWidth });
+      rightYPage2 += hRight + boxSpacingYPage2;
+      if (isMain) doc.font("Helvetica").fillColor("black");
+    }
+
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 3: RATING DISTRIBUTION ───
+    doc.addPage();
+    currentPageNumber++;
+
+    doc.fontSize(14).fillColor('black').text("Category Score Distribution", { align: "left" });
+    doc.moveDown(1);
+
+    // Chart
+    doc.image(likertBuffer, {
+      fit: [700, 300],
+      align: "center",
+      valign: "top",
+    });
+    doc.moveDown(2);
+
+    // Fetch ratings
+    const rawRatings = await getPermanceScoreBySEID(se_id);
+    const ratingGrouped = {};
+    rawRatings.forEach(({ category_name, rating, rating_count }) => {
+      if (!ratingGrouped[category_name]) ratingGrouped[category_name] = {};
+      ratingGrouped[category_name][rating] = parseInt(rating_count);
+    });
+
+    // Layout config
+    const pageHeight = doc.page.height - doc.page.margins.top - doc.page.margins.bottom;
+    const scoreDistributionScoreLeftAxis = 40;
+    const scoreDistributionGapY = 10;
+    const columnWidth = 180;
+    const blockHeight = 90;
+    const columnsPerRow = 3;
+
+    doc.fontSize(12).fillColor('black').text("Score Breakdown", scoreDistributionScoreLeftAxis, doc.y, { underline: true });
+    doc.moveDown(1);
+    doc.fontSize(10);
+
+    const categories = Object.entries(ratingGrouped);
+    categories.forEach(([category, ratings], index) => {
+      const col = index % columnsPerRow;
+      const row = Math.floor(index / columnsPerRow);
+      const x = scoreDistributionScoreLeftAxis + col * columnWidth;
+      const y = 350 + row * blockHeight;
+
+      doc.font("Helvetica-Bold").fillColor('black').text(category, x, y); // Changed to black
+
+      for (let r = 1; r <= 5; r++) {
+        const count = ratings[r] || 0;
+        doc.font("Helvetica").fillColor('black').text(`${r} Star: ${count}`, x + 15, y + r * 12); // Changed to black
+      }
+    });
+
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 4: INSIGHTS ───
+    doc.addPage();
+    currentPageNumber++;
+
+    const page4AxisX = 40;
+    const page4AxisY = doc.y;
+    const page4MaxWidth = 520;
+    const page4GapY = 10;
+    const page4Height = doc.page.height - doc.page.margins.top - doc.page.margins.bottom;
+
+    doc.fontSize(12).fillColor('black').text("Insights", page4AxisX, page4AxisY, { underline: true });
+    doc.moveDown(1);
+    doc.fontSize(10);
+    let currentPage4Y = doc.y + 10;
+
+    // Advice Map
+    const categoryAdviceMap = {
+      "Marketing Plan/Execution": "Consider building a structured marketing roadmap, including branding, channels, and timeline execution.",
+      "Teamwork": "Group dynamics might need improvement—explore peer motivation, accountability practices, and better communication norms.",
+      "Logistics": "To streamline operations, evaluate supply chain workflows and introduce tools for scheduling or delivery optimization.",
+      "Financial Planning/Management": "Ensure budgeting, reporting, and forecasting frameworks are in place and consistently followed.",
+      "Product/Service Design/Planning": "Encourage user feedback loops, prototyping cycles, and iteration strategies.",
+      "Human Resource Management": "Consider formalizing recruitment, training, and performance appraisal systems.",
+    };
+
+    // Generate insights
+    for (const [category, ratings] of Object.entries(ratingGrouped)) {
+      const total = Object.values(ratings).reduce((sum, val) => sum + val, 0);
+      const weighted = Object.entries(ratings).reduce(
+        (acc, [r, c]) => acc + parseInt(r) * c,
+        0
+      );
+      const average = total > 0 ? (weighted / total).toFixed(2) : "N/A";
+
+      const score1 = ratings[1] || 0;
+      const score2 = ratings[2] || 0;
+      const score3 = ratings[3] || 0;
+      const score4 = ratings[4] || 0;
+      const score5 = ratings[5] || 0;
+
+      // Determine key remark
+      let remark = "";
+      if (average >= 4 && score4 + score5 >= total * 0.7) {
+        remark = "Strong performance with most evaluators awarding high marks. The SE demonstrates confidence and consistency in this area.";
+      } else if (average >= 4) {
+        remark = "Generally strong area, though a few ratings suggest opportunities to reach excellence with more consistency.";
+      } else if (average >= 3) {
+        if (score1 + score2 >= total * 0.3) {
+          remark = "Mixed performance. While some scores are favorable, a notable proportion of low ratings suggests deeper inconsistencies.";
+        } else {
+          remark = "Moderate strength. There is foundational capability here, but enhancements could help reach best-in-class execution.";
+        }
+      } else if (average <= 2) {
+        remark = "This category is underperforming. A high concentration of low scores indicates a need for structured support and attention.";
+      } else {
+        remark = "Inconsistent performance. Low and mid-tier ratings dominate—suggests unclear processes or insufficient capability.";
+      }
+
+      const advice = categoryAdviceMap[category] ? ` ${categoryAdviceMap[category]}` : "";
+
+      // Combine and format the insight block
+      const title = `${category}`;
+      const avgLine = `Average Score: ${average} / 5`;
+      const fullInsight = `${remark}${advice}`;
+
+      const titleHeight = doc.heightOfString(title, { width: page4MaxWidth });
+      const avgLineHeight = doc.heightOfString(avgLine, { width: page4MaxWidth });
+      const fullInsightHeight = doc.heightOfString(fullInsight, { width: page4MaxWidth });
+
+      const totalHeight = titleHeight + avgLineHeight + fullInsightHeight + page4GapY;
+
+      // Add new page if needed with proper page numbering
+      if (currentPage4Y + totalHeight > page4Height) {
+        addPageNumber(currentPageNumber, estimatedTotalPages);
+
+        doc.addPage();
+        currentPageNumber++;
+        currentPage4Y = doc.y;
+      }
+
+      // Render
+      doc.font("Helvetica-Bold").fillColor('black').text(title, page4AxisX, currentPage4Y, { width: page4MaxWidth });
+      currentPage4Y += titleHeight;
+
+      doc.font("Helvetica-Bold").fillColor('black').text(avgLine, page4AxisX, currentPage4Y, { width: page4MaxWidth });
+      currentPage4Y += avgLineHeight;
+
+      doc.font("Helvetica").fillColor('black').text(fullInsight, page4AxisX, currentPage4Y, {
+        width: page4MaxWidth,
+        lineGap: 2,
+      });
+      currentPage4Y += fullInsightHeight + page4GapY;
+    }
+
+    // Update estimated total pages and add page number to final page
+    estimatedTotalPages = currentPageNumber;
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    doc.end();
+  } catch (err) {
+    console.error("❌ Error generating report:", err);
+    res.status(500).json({ message: "Failed to generate PDF" });
+  }
+});
+
+// Updated Financial Report Route
+app.post("/api/financial-report", async (req, res) => {
+  try {
+    const {
+      chartImage,
+      selectedSEId,
+      totalRevenue,
+      totalExpenses,
+      netIncome,
+      totalAssets,
+      selectedSERevenueVsExpensesData,
+      cashFlowImage,
+      transformedCashFlowData,
+      equityImage,
+      selectedSEEquityTrendData,
+      inventoryTurnoverByItemData,
+      netProfitMargin,
+      grossProfitMargin,
+      debtToAssetRatio
+    } = req.body;
+
+    if (!chartImage || !selectedSEId) {
+      return res.status(400).json({ message: "Missing required data" });
+    }
+
+    const socialEnterpriseDetails = await getSocialEnterpriseByID(selectedSEId);
+    const chartBuffer = Buffer.from(chartImage.split(",")[1], "base64");
+
+    const doc = new PDFDocument({
+      size: "A4",
+      layout: "landscape",
+      margin: 40,
+    });
+
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=${selectedSEId}_Financial_Report.pdf`,
+      });
+      res.send(pdfBuffer);
+    });
+
+    // Declare variables for page numbering
+    let estimatedTotalPages = 4;
+    let currentPageNumber = 1;
+
+    // Helper function to add page number to current page
+    const addPageNumber = (pageNum, totalPages) => {
+      const pageWidth = doc.page.width;
+      const margin = doc.page.margins.top;
+
+      const currentFontSize = doc._fontSize;
+
+      doc.fontSize(10)
+        .fillColor('black') // Changed from gray to black
+        .text(`Page ${pageNum} of ${totalPages}`,
+          pageWidth - 120,
+          margin - 20,
+          { align: 'right', width: 100 });
+
+      doc.fontSize(currentFontSize);
+      doc.fillColor('black');
+    };
+
+    // Helper function to display "No Data Available" message
+    const displayNoDataMessage = (title) => {
+      const currentY = doc.y;
+      const boxHeight = 200;
+      const boxWidth = 700;
+      const centerX = (doc.page.width - boxWidth) / 2;
+
+      // Draw a black border instead of light gray
+      doc.rect(centerX, currentY, boxWidth, boxHeight)
+        .strokeColor('black')
+        .stroke();
+
+      // Add "No Data Available" text in center with black color
+      doc.fontSize(16)
+        .fillColor('black') // Changed from gray to black
+        .text('No Data Available',
+          centerX,
+          currentY + (boxHeight / 2) - 10,
+          { width: boxWidth, align: 'center' });
+
+      doc.fillColor('black');
+      doc.y = currentY + boxHeight + 10;
+    };
+
+    // ─── PAGE 1: TITLE & SUMMARY ───
+
+    // Title & Summary
+    doc.fontSize(20).fillColor('black').text(`${socialEnterpriseDetails.team_name} Financial Report`, { align: "center" });
+    doc.fontSize(12);
+    doc.moveDown(0.5);
+
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    doc.fillColor('black').text(`Generated as of ${formattedDate}`, { align: "left" });
+
+    const leftColX = 40;
+    let leftY = 90;
+
+    doc.fillColor('black').text(`Total Revenue: Php ${Number(totalRevenue).toLocaleString()}`, leftColX, leftY);
+    leftY += 16;
+    doc.fillColor('black').text(`Total Expenses: Php ${Number(totalExpenses).toLocaleString()}`, leftColX, leftY);
+    leftY += 16;
+    doc.fillColor('black').text(`Net Income: Php ${Number(netIncome).toLocaleString()}`, leftColX, leftY);
+    leftY += 16;
+    doc.fillColor('black').text(`Total Assets: Php ${Number(totalAssets).toLocaleString()}`, leftColX, leftY);
+    doc.moveDown(2);
+
+    // Chart
+    doc.fontSize(14).fillColor('black').text("Revenue vs Expenses Overview", { underline: true });
+    doc.moveDown(1);
+
+    // Check if chart data exists and is valid
+    const hasRevenueExpenseData = selectedSERevenueVsExpensesData &&
+      selectedSERevenueVsExpensesData.length > 0 &&
+      selectedSERevenueVsExpensesData.some(series => series.data && series.data.length > 0);
+
+    if (hasRevenueExpenseData && chartImage && chartBuffer) {
+      try {
+        doc.image(chartBuffer, {
+          fit: [700, 200],
+          align: "center",
+        });
+      } catch (imageError) {
+        console.warn("Error displaying revenue/expense chart:", imageError);
+        displayNoDataMessage("Revenue vs Expenses Overview");
+      }
+    } else {
+      displayNoDataMessage("Revenue vs Expenses Overview");
+      console.log("Missing data - Revenue/Expense chart:", {
+        hasData: hasRevenueExpenseData,
+        hasImage: !!chartImage,
+        hasBuffer: !!chartBuffer
+      });
+    }
+
+    doc.moveDown(1.5);
+
+    // Insights
+    doc.fontSize(14).fillColor('black').text("Financial Insights", { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(9);
+
+    const insightsX = 40;
+    const maxWidth = 700;
+    const gapY = 14;
+    let insightsY = doc.y;
+
+    const insights = [];
+
+    // General Metrics (keeping existing logic but ensuring black text)
+    if (totalRevenue > totalExpenses) {
+      insights.push("The enterprise is profitable overall, with revenues exceeding expenses.");
+    } else {
+      insights.push("Overall expenses exceed revenue, suggesting a deficit situation that warrants attention.");
+    }
+
+    if (netIncome < 0) {
+      insights.push("Net income is negative, indicating a loss position. Consider reviewing cost and revenue drivers.");
+    } else {
+      insights.push("The enterprise reports a positive net income, reflecting a financially sound position.");
+    }
+
+    if (totalAssets > 0 && netIncome / totalAssets < 0.05) {
+      insights.push("Return on assets is relatively low. Consider strategies to optimize asset utilization.");
+    } else if (netIncome / totalAssets >= 0.05) {
+      insights.push("Assets are generating good returns, indicating efficient resource deployment.");
+    }
+
+    // Time-Series Analysis (keeping existing logic)
+    if (hasRevenueExpenseData) {
+      const revenueSeries = selectedSERevenueVsExpensesData.find(s => s.id === "Revenue");
+      const expenseSeries = selectedSERevenueVsExpensesData.find(s => s.id === "Expenses");
+
+      if (revenueSeries && expenseSeries) {
+        const revData = revenueSeries.data;
+        const expData = expenseSeries.data;
+
+        const revRecent = revData.slice(-2);
+        const expRecent = expData.slice(-2);
+
+        const [revQ1, revQ2] = revRecent.map(p => p.y);
+        const [expQ1, expQ2] = expRecent.map(p => p.y);
+
+        if (revQ2 > revQ1) {
+          insights.push("Revenue increased in the most recent quarter, reflecting positive momentum.");
+        } else if (revQ2 < revQ1) {
+          insights.push("Revenue declined in the most recent quarter. Investigating underlying drivers is recommended.");
+        } else {
+          insights.push("Revenue remained flat in the last two quarters.");
+        }
+
+        if (expQ2 > expQ1) {
+          insights.push("Expenses rose in the latest quarter. Monitoring cost controls is advised.");
+        } else if (expQ2 < expQ1) {
+          insights.push("Expenses declined recently. Cost-saving initiatives may be taking effect.");
+        } else {
+          insights.push("Expenses remained stable in the past two quarters.");
+        }
+
+        const maxRev = revData.reduce((a, b) => (a.y > b.y ? a : b));
+        const minRev = revData.reduce((a, b) => (a.y < b.y ? a : b));
+        insights.push(`The highest revenue was recorded in ${maxRev.x} (Php ${maxRev.y.toLocaleString()}).`);
+        insights.push(`The lowest revenue occurred in ${minRev.x} (Php ${minRev.y.toLocaleString()}).`);
+
+        const maxExp = expData.reduce((a, b) => (a.y > b.y ? a : b));
+        const minExp = expData.reduce((a, b) => (a.y < b.y ? a : b));
+        insights.push(`The highest expenses were in ${maxExp.x} (Php ${maxExp.y.toLocaleString()}).`);
+        insights.push(`The lowest expenses occurred in ${minExp.x} (Php ${minExp.y.toLocaleString()}).`);
+
+        const revVolatility = revData.map((v, i, arr) => i > 0 ? Math.abs(v.y - arr[i - 1].y) : 0).reduce((a, b) => a + b, 0);
+        const expVolatility = expData.map((v, i, arr) => i > 0 ? Math.abs(v.y - arr[i - 1].y) : 0).reduce((a, b) => a + b, 0);
+
+        if (revVolatility > expVolatility) {
+          insights.push("Revenue has shown more variability than expenses over the reporting period.");
+        } else if (revVolatility < expVolatility) {
+          insights.push("Expenses have fluctuated more than revenue, possibly due to inconsistent cost drivers.");
+        } else {
+          insights.push("Revenue and expenses have fluctuated at a similar pace over time.");
+        }
+      }
+    } else {
+      insights.push("No revenue and expense trend data available for detailed analysis.");
+    }
+
+    // Render Insights in Three Independent Columns with black text
+    const columnWidth = 220;
+    const columnGap = 20;
+    const totalColumns = 3;
+    const columnX = [insightsX, insightsX + columnWidth + columnGap, insightsX + 2 * (columnWidth + columnGap)];
+    const columnYs = [doc.y, doc.y, doc.y];
+
+    insights.forEach((text, i) => {
+      const colIndex = i % totalColumns;
+      doc.fillColor('black').text(`• ${text}`, columnX[colIndex], columnYs[colIndex], {
+        width: columnWidth,
+        align: "left",
+      });
+
+      const textHeight = doc.heightOfString(`• ${text}`, { width: columnWidth });
+      columnYs[colIndex] += textHeight + 6;
+    });
+
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 2: CASHFLOW ANALYSIS ───
+    doc.addPage();
+    currentPageNumber++;
+
+    doc.fontSize(14).fillColor('black').text("Cashflow Analysis", { underline: true });
+    doc.moveDown(1);
+
+    // Check if cashflow data exists
+    const hasCashFlowData = transformedCashFlowData && transformedCashFlowData.length > 0;
+
+    // Cashflow Chart
+    if (cashFlowImage && hasCashFlowData) {
+      try {
+        const cashFlowBuffer = Buffer.from(cashFlowImage.split(",")[1], "base64");
+        doc.image(cashFlowBuffer, {
+          fit: [700, 200],
+          align: "center",
+        });
+        doc.moveDown(1.5);
+      } catch (imageError) {
+        console.warn("Error displaying cashflow chart:", imageError);
+        displayNoDataMessage("Cashflow Chart");
+        doc.moveDown(1.5);
+      }
+    } else {
+      displayNoDataMessage("Cashflow Chart");
+      console.log("Missing data - Cashflow chart:", {
+        hasImage: !!cashFlowImage,
+        hasData: hasCashFlowData
+      });
+      doc.moveDown(1.5);
+    }
+
+    // Generate Cashflow Insights
+    const cashflowData = transformedCashFlowData;
+    const cashflowInsights = [];
+
+    if (hasCashFlowData) {
+      const highestInflow = cashflowData.reduce((a, b) => (a.Inflow > b.Inflow ? a : b));
+      const highestOutflow = cashflowData.reduce((a, b) => (a.Outflow > b.Outflow ? a : b));
+
+      const inflowOnly = cashflowData.filter(q => q.Inflow > 0).map(q => q.Inflow);
+      const outflowOnly = cashflowData.filter(q => q.Outflow > 0).map(q => q.Outflow);
+
+      if (inflowOnly.length > 0) {
+        const avgInflow = inflowOnly.reduce((a, b) => a + b, 0) / inflowOnly.length;
+        cashflowInsights.push(`Average inflow across reporting periods is Php ${Math.round(avgInflow).toLocaleString()}.`);
+      }
+
+      if (outflowOnly.length > 0) {
+        const avgOutflow = outflowOnly.reduce((a, b) => a + b, 0) / outflowOnly.length;
+        cashflowInsights.push(`Average outflow across reporting periods is Php ${Math.round(avgOutflow).toLocaleString()}.`);
+      }
+
+      cashflowInsights.push(`The highest recorded cash inflow was in ${highestInflow.quarter} (Php ${highestInflow.Inflow.toLocaleString()}).`);
+      cashflowInsights.push(`The highest recorded cash outflow was in ${highestOutflow.quarter} (Php ${highestOutflow.Outflow.toLocaleString()}).`);
+
+      if (inflowOnly.length > 0 && outflowOnly.length > 0) {
+        const avgInflow = inflowOnly.reduce((a, b) => a + b, 0) / inflowOnly.length;
+        const avgOutflow = outflowOnly.reduce((a, b) => a + b, 0) / outflowOnly.length;
+
+        if (avgInflow > avgOutflow) {
+          cashflowInsights.push("Overall cash position is positive with average inflows exceeding outflows.");
+        } else if (avgInflow < avgOutflow) {
+          cashflowInsights.push("Enterprise is in a negative cashflow situation—monitor spending and improve revenue inflows.");
+        } else {
+          cashflowInsights.push("Average inflows and outflows are balanced. Sustaining this may require tight operational controls.");
+        }
+      }
+
+      const q1 = cashflowData[cashflowData.length - 2];
+      const q2 = cashflowData[cashflowData.length - 1];
+      if (q1 && q2) {
+        if (q2.Inflow > q1.Inflow) {
+          cashflowInsights.push("Cash inflow improved in the recent quarter.");
+        } else if (q2.Inflow < q1.Inflow) {
+          cashflowInsights.push("Cash inflow declined in the latest quarter.");
+        }
+
+        if (q2.Outflow > q1.Outflow) {
+          cashflowInsights.push("Cash outflow increased in the recent quarter—monitor financial controls.");
+        } else if (q2.Outflow < q1.Outflow) {
+          cashflowInsights.push("Cash outflow reduced this quarter, indicating possible operational efficiency.");
+        }
+      }
+    } else {
+      cashflowInsights.push("No cashflow data available for analysis.");
+    }
+
+    // Render Cashflow Insights with black text
+    doc.fontSize(14).fillColor('black').text("Cashflow Insights", { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10);
+    let cashflowY = doc.y;
+
+    cashflowInsights.forEach((text) => {
+      doc.fillColor('black').text(`• ${text}`, insightsX, cashflowY, {
+        width: maxWidth,
+        align: "left",
+      });
+      cashflowY += gapY;
+    });
+
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 3: EQUITY ANALYSIS ───
+    doc.addPage();
+    currentPageNumber++;
+
+    doc.fontSize(14).fillColor('black').text("Net Worth (Equity) Over Time", { underline: true });
+    doc.moveDown(1);
+
+    // Check if equity data exists
+    const hasEquityData = selectedSEEquityTrendData &&
+      selectedSEEquityTrendData.length > 0 &&
+      selectedSEEquityTrendData[0]?.data &&
+      selectedSEEquityTrendData[0].data.length > 0;
+
+    if (equityImage && hasEquityData) {
+      try {
+        const equityBuffer = Buffer.from(equityImage.split(",")[1], "base64");
+        doc.image(equityBuffer, { fit: [700, 200], align: "center" });
+        doc.moveDown(1.5);
+      } catch (imageError) {
+        console.warn("Error displaying equity chart:", imageError);
+        displayNoDataMessage("Equity Trend Chart");
+        doc.moveDown(1.5);
+      }
+    } else {
+      displayNoDataMessage("Equity Trend Chart");
+      console.log("Missing data - Equity chart:", {
+        hasImage: !!equityImage,
+        hasData: hasEquityData
+      });
+      doc.moveDown(1.5);
+    }
+
+    doc.fontSize(14).fillColor('black').text("Equity Insights", { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10);
+    let equityY = doc.y;
+    const equityData = hasEquityData ? selectedSEEquityTrendData[0].data : [];
+    const equityInsights = [];
+
+    if (hasEquityData) {
+      const sorted = [...equityData];
+      const highest = sorted.reduce((a, b) => a.y > b.y ? a : b);
+      const lowest = sorted.reduce((a, b) => a.y < b.y ? a : b);
+      equityInsights.push(`Equity peaked in ${highest.x} at Php ${highest.y.toLocaleString()}, but declined afterwards.`);
+      equityInsights.push(`The lowest equity value was in ${lowest.x} at Php ${lowest.y.toLocaleString()}, raising concerns on retained value.`);
+      if (equityData.length >= 2) {
+        const prev = equityData[equityData.length - 2];
+        const curr = equityData[equityData.length - 1];
+        if (curr.y > prev.y) equityInsights.push("Equity increased in the most recent quarter—potentially from profit or owner contribution.");
+        else if (curr.y < prev.y) equityInsights.push("Equity declined in the recent quarter, possibly due to losses or withdrawals.");
+      }
+      equityInsights.push("Volatility in equity levels suggests instability in net worth—sustained growth strategy needed.");
+      equityInsights.push("No consistent growth trend seen—investors may require reassurance on long-term value creation.");
+    } else {
+      equityInsights.push("No equity trend data available for analysis.");
+    }
+
+    equityInsights.forEach((text) => {
+      doc.fillColor('black').text(`• ${text}`, insightsX, equityY, {
+        width: maxWidth,
+        align: "left",
+      });
+      equityY += gapY;
+    });
+
+    // Inventory Turnover Analysis (after Equity) with black text
+    const inventoryInsights = [];
+    if (inventoryTurnoverByItemData && inventoryTurnoverByItemData.length > 0) {
+      const turnoverRates = inventoryTurnoverByItemData.map(i => i.turnover);
+      const avgTurnover = turnoverRates.length
+        ? turnoverRates.reduce((a, b) => a + b, 0) / turnoverRates.length
+        : 0.1;
+
+      inventoryInsights.push(`Average turnover rate across inventory: ${(avgTurnover * 100).toFixed(1)}%.`);
+
+      inventoryTurnoverByItemData.forEach(item => {
+        const rate = (item.turnover * 100).toFixed(1);
+        if (item.turnover > avgTurnover * 1.25) {
+          inventoryInsights.push(`- ${item.name}: Turnover at ${rate}%, significantly above average — strong sales.`);
+        } else if (item.turnover < avgTurnover * 0.75) {
+          inventoryInsights.push(`- ${item.name}: Turnover at ${rate}%, below average — monitor for slow movement.`);
+        } else {
+          inventoryInsights.push(`- ${item.name}: Turnover at ${rate}%, consistent with average.`);
+        }
+      });
+    } else {
+      inventoryInsights.push("No inventory turnover data available for analysis.");
+    }
+
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    // ─── PAGE 4: STAKEHOLDER SUMMARY & INVESTMENT OUTLOOK ───
+    doc.addPage();
+    currentPageNumber++;
+
+    doc.fontSize(14).fillColor('black').text("Stakeholder Summary & Investment Outlook", { underline: true });
+    doc.moveDown(1);
+
+    // Display Key Financial Ratios with black text
+    doc.fontSize(12).fillColor('black').text("Key Financial Ratios", { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10);
+
+    const displayRatio = (label, value) =>
+      typeof value === "number" && !isNaN(value)
+        ? `${label}: ${(value * 100).toFixed(2)}%`
+        : `${label}: Data unavailable`;
+
+    const keyRatios = [
+      displayRatio("Net Profit Margin", netProfitMargin),
+      displayRatio("Gross Profit Margin", grossProfitMargin),
+      displayRatio("Debt-to-Asset Ratio", debtToAssetRatio),
+    ];
+
+    let ratioY = doc.y;
+    keyRatios.forEach((line) => {
+      doc.fillColor('black').text(`• ${line}`, 40, ratioY, { width: 700, align: "left" });
+      ratioY += 14;
+    });
+
+    doc.moveDown(1);
+
+    // Financial Outlook Insights with black text
+    doc.fontSize(12).fillColor('black').text("Outlook Insights", { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10);
+
+    const outlookInsights = generateDynamicOutlook({
+      netIncome,
+      totalAssets,
+      transformedCashFlowData,
+      selectedSEEquityTrendData,
+      inventoryTurnoverByItemData,
+      netProfitMargin,
+      grossProfitMargin,
+      debtToAssetRatio,
+    });
+
+    let outlookY = doc.y;
+    outlookInsights.forEach((text) => {
+      doc.fillColor('black').text(`• ${text}`, 40, outlookY, { width: 700, align: "left" });
+      outlookY += 14;
+    });
+
+    // Update estimated total pages and add page number to final page
+    estimatedTotalPages = currentPageNumber;
+    addPageNumber(currentPageNumber, estimatedTotalPages);
+
+    doc.end();
+  } catch (err) {
+    console.error("❌ Error generating financial report:", err);
+    res.status(500).json({ message: "Failed to generate report" });
   }
 });
 
@@ -2790,7 +4255,7 @@ app.get("/api/get-Mentorships-by-ID", async (req, res) => {
   }
 });
 
-app.get("/api/get-Available-Evaluations", async (req, res) => {
+app.get("/api/get-available-evaluations", async (req, res) => {
   try {
     const mentor_id = req.session.user?.id;
 
@@ -2813,7 +4278,7 @@ app.get("/api/get-Available-Evaluations", async (req, res) => {
 });
 
 
-app.get("/api/get-PreDefined-Comments", async (req, res) => {
+app.get("/api/get-predefined-comments", async (req, res) => {
   try {
     const data = await getPreDefinedComments(); // Fetch predefined comments
 
@@ -2967,7 +4432,7 @@ app.put("/api/notifications/:notificationId/read", async (req, res) => {
 });
 
 // API endpoint to fetch all programs
-app.get("/api/getPrograms", async (req, res) => {
+app.get("/api/get-programs", async (req, res) => {
   try {
     const programs = await getPrograms(); // Fetch programs from the controller
     res.json(programs); // Send the programs as JSON
@@ -3006,7 +4471,7 @@ app.get("/api/active-mentors", async (req, res) => {
 });
 
 // Fetch active mentors
-app.get("/api/getAllEvaluations", async (req, res) => {
+app.get("/api/get-all-evaluations", async (req, res) => {
   try {
     const program = req.query.program || null; // Optional program param
 
@@ -4651,7 +6116,7 @@ app.post("/api/mentorships", async (req, res) => {
   }
 });
 
-app.post("/api/approveMentorship", async (req, res) => {
+app.post("/api/approve-mentorship", async (req, res) => {
   const { mentoring_session_id, mentorship_id, mentorship_date, mentorship_time, zoom_link } = req.body;
 
   try {
@@ -4725,7 +6190,7 @@ app.post("/api/approveMentorship", async (req, res) => {
   }
 });
 
-app.post("/api/declineMentorship", async (req, res) => {
+app.post("/api/decline-mentorship", async (req, res) => {
   const { mentoring_session_id } = req.body;
 
   console.log("Declining mentorship with ID:", mentoring_session_id);

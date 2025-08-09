@@ -39,10 +39,9 @@ import {
   Business,
   EventAvailable,
 } from "@mui/icons-material";
-import axios from "axios";
 import axiosClient from "../../api/axiosClient";
 
-const Dashboard = ({}) => {
+const Dashboard = ({ }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { user, isMentorView, toggleView, loading: authLoading } = useAuth();
@@ -52,7 +51,6 @@ const Dashboard = ({}) => {
   const [socialEnterprises, setSocialEnterprises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [evaluations, setEvaluations] = useState([]);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [mentorEvaluations, setmentorEvaluations] = useState([]);
   const [upcomingSchedules, setupcomingSchedules] = useState([]);
   const [isLoadingEvaluations, setIsLoadingEvaluations] = useState(false);
@@ -70,48 +68,26 @@ const Dashboard = ({}) => {
     totalPrograms: 0,
     previousUnassignedMentors: 0,
   });
-  const [percentageIncrease, setPercentageIncrease] = useState("0%");
 
   const hasMentorRole = user?.roles?.includes("Mentor");
-  const isLSEEDUser = user?.roles?.some(
-    (role) => role === "LSEED-Coordinator" || role === "Administrator"
-  );
+  const isLSEEDUser = user?.roles?.some(role => role === "LSEED-Coordinator");
   const isCoordinator = user?.roles?.includes("LSEED-Coordinator");
   const hasBothRoles = hasMentorRole && isLSEEDUser;
   const isCoordinatorView = !isMentorView;
 
-  const mockStats = {
-    totalEvaluations: 25,
-    averageRating: 4.3,
-    mostCommonRating: 5,
-    socialEnterprisesHandled: 10,
-  };
-
   useEffect(() => {
     const fetchMentorDashboardStats = async () => {
       try {
-        const response = await axiosClient.get(
-          `/api/fetch-mentor-dashboard-stats`
-        );
+
+        const response = await axiosClient.get(`/api/fetch-mentor-dashboard-stats`);
 
         const data = response.data;
 
         const formattedData = {
-          totalEvalMade: parseInt(
-            data.totalEvalMade?.[0]?.evaluation_count ?? "0",
-            10
-          ),
-          avgRatingGiven: parseFloat(
-            data.avgRatingGiven?.[0]?.average_rating ?? "0"
-          ),
-          mostCommonRating: parseInt(
-            data.mostCommonRating?.[0]?.rating ?? "0",
-            10
-          ),
-          mentorshipsCount: parseInt(
-            data.mentorshipsCount?.[0]?.mentorship_count ?? "0",
-            10
-          ),
+          totalEvalMade: parseInt(data.totalEvalMade?.[0]?.evaluation_count ?? "0", 10),
+          avgRatingGiven: parseFloat(data.avgRatingGiven?.[0]?.average_rating ?? "0"),
+          mostCommonRating: parseInt(data.mostCommonRating?.[0]?.rating ?? "0", 10),
+          mentorshipsCount: parseInt(data.mentorshipsCount?.[0]?.mentorship_count ?? "0", 10),
         };
 
         console.log("DATA DEBUG:", formattedData);
@@ -130,6 +106,7 @@ const Dashboard = ({}) => {
     }
   }, [user]);
 
+
   const alertColumns = [
     { field: "seName", headerName: "SE Name", flex: 2 },
     {
@@ -143,8 +120,8 @@ const Dashboard = ({}) => {
               params.value === 0
                 ? "gray"
                 : params.value < 1.5
-                ? colors.redAccent[500]
-                : "black",
+                  ? colors.redAccent[500]
+                  : "black",
             display: "flex",
             fontWeight: "bold",
             alignItems: "center",
@@ -206,12 +183,9 @@ const Dashboard = ({}) => {
         let response;
 
         if (hasMentorRole) {
-          response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getRecentMentorEvaluations`,
-            {
-              withCredentials: true,
-            }
-          );
+          response = await axiosClient.get(`${process.env.REACT_APP_API_BASE_URL}/api/get-recent-mentor-evaluations`, {
+            withCredentials: true,
+          });
         } else {
           setmentorEvaluations([]); // clear any old data
           return;
@@ -250,16 +224,9 @@ const Dashboard = ({}) => {
         let response;
 
         if (hasMentorRole) {
-          response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getUpcomingSchedulesForMentor`,
-            {
-              withCredentials: true,
-            }
-          );
+          response = await axiosClient.get(`/api/get-upcoming-schedules-for-mentor`);
         } else {
-          console.log(
-            "User is not a Mentor → skipping mentor evaluations fetch."
-          );
+          console.log("User is not a Mentor → skipping mentor evaluations fetch.");
           setmentorEvaluations([]); // clear any old data
           return;
         }
@@ -279,30 +246,10 @@ const Dashboard = ({}) => {
   }, [user]);
 
   const mentorColumns = [
-    {
-      field: "social_enterprise",
-      headerName: "Social Enterprise",
-      flex: 1,
-      minWidth: 100,
-    },
-    {
-      field: "evaluator_name",
-      headerName: "Evaluator",
-      flex: 1,
-      minWidth: 100,
-    },
-    {
-      field: "acknowledged",
-      headerName: "Acknowledged",
-      flex: 1,
-      minWidth: 100,
-    },
-    {
-      field: "evaluation_date",
-      headerName: "Evaluation Date",
-      flex: 1,
-      minWidth: 100,
-    },
+    { field: "social_enterprise", headerName: "Social Enterprise", flex: 1, minWidth: 100 },
+    { field: "evaluator_name", headerName: "Evaluator", flex: 1, minWidth: 100 },
+    { field: "acknowledged", headerName: "Acknowledged", flex: 1, minWidth: 100 },
+    { field: "evaluation_date", headerName: "Evaluation Date", flex: 1, minWidth: 100 },
     {
       field: "action",
       headerName: "Action",
@@ -324,28 +271,27 @@ const Dashboard = ({}) => {
     try {
       const { id, mentorship_id, realDate, realTime, zoom } = schedule;
 
-      const response = await axiosClient.post(
-        `${process.env.REACT_APP_API_BASE_URL}/api/approveMentorship`,
-        {
-          mentoring_session_id: id,
-          mentorship_id,
-          mentorship_date: realDate,
-          mentorship_time: realTime,
-          zoom_link: zoom,
-        }
-      );
+      const response = await axiosClient.post('/api/approve-mentorship', {
+        mentoring_session_id: id,
+        mentorship_id,
+        mentorship_date: realDate,
+        mentorship_time: realTime,
+        zoom_link: zoom,
+      });
 
-      if (!response.ok) {
-        const errorMessage = await response.text();
-        throw new Error(`Failed to approve mentorship: ${errorMessage}`);
-      }
+      console.log("Mentorship approved successfully", response.data);
 
-      console.log("Mentorship approved successfully");
-
-      // Show success message
+      // ✅ Set success snackbar
+      setSnackbarMessage("Mentorship approved successfully");
+      setSnackbarSeverity("success");
       setSnackbarOpen(true);
     } catch (error) {
       console.error("Error approving mentorship:", error);
+
+      // ❌ Set error snackbar
+      setSnackbarMessage(error?.response?.data?.message || "Failed to approve mentorship");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
     }
   };
 
@@ -353,24 +299,23 @@ const Dashboard = ({}) => {
     try {
       const { id } = schedule; // Extract ID
 
-      const response = await axiosClient.post(
-        `${process.env.REACT_APP_API_BASE_URL}/declineMentorship`,
-        {
-          mentoring_session_id: id,
-        }
-      );
+      const response = await axiosClient.post('/api/decline-mentorship', {
+        mentoring_session_id: id,
+      });
 
-      if (!response.ok) {
-        const errorMessage = await response.text();
-        throw new Error(`Failed to decline mentorship: ${errorMessage}`);
-      }
+      console.log("Mentorship declined successfully", response.data);
 
-      console.log("Mentorship declined successfully");
-
-      // Show success message
-      setSnackbarOpen(true); // Ensure setSnackbarOpen is defined
+      // ✅ Success Snackbar
+      setSnackbarMessage("Mentorship declined successfully");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
     } catch (error) {
       console.error("Error declining mentorship:", error);
+
+      // ❌ Error Snackbar
+      setSnackbarMessage(error?.response?.data?.message || "Failed to decline mentorship");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
     }
   };
 
@@ -535,7 +480,7 @@ const Dashboard = ({}) => {
       headerName: "Zoom Link",
       flex: 1,
       minWidth: 150,
-      renderCell: (params) =>
+      renderCell: (params) => (
         params.value && params.value !== "N/A" ? (
           <a
             href={params.value}
@@ -549,30 +494,31 @@ const Dashboard = ({}) => {
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             N/A
           </Typography>
-        ),
+        )
+      ),
     },
   ];
 
+  // TO DO: change query for flagged
   useEffect(() => {
     const fetchFlaggedSE = async () => {
       try {
         let response;
 
         if (isCoordinator) {
-          const res = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              withCredentials: true,
-            }
-          );
+          const res = await axiosClient.get(`/api/get-program-coordinator`);
           const data = res.data;
           const program = data[0]?.name;
 
-          response = await axiosClient(`/api/flagged-ses?program=${program}`);
+          response = await axiosClient.get(
+            `/api/flagged-ses?program=${program}`
+          );
         } else {
-          response = await axiosClient(`/api/flagged-ses`);
+          response = await axiosClient.get(
+            `/api/flagged-ses`
+          );
         }
-        const data = response.data;
+        const data = await response.data; 
 
         if (Array.isArray(data)) {
           const formattedSEs = data.map((se) => ({
@@ -601,25 +547,21 @@ const Dashboard = ({}) => {
         let response;
 
         if (isCoordinator) {
-          const res = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              withCredentials: true,
-            }
-          );
+          const res = await axiosClient.get(`/api/get-program-coordinator`);
 
           const data = res.data;
           const program = data[0]?.name;
 
-          response = await axiosClient(
+          response = await axiosClient.get(
             `/api/pending-schedules?program=${program}`
           );
-        } else {
-          response = await axiosClient(`/api/pending-schedules`);
+        }
+        else {
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/pending-schedules`
+          );
         }
         const data = response.data;
-
-        console.log("📅 Mentor Schedules Data:", data); // ✅ Debugging log
 
         if (Array.isArray(data)) {
           setMentorSchedules(data);
@@ -660,7 +602,7 @@ const Dashboard = ({}) => {
 
     try {
       const response = await axiosClient.get(
-        `${process.env.REACT_APP_API_BASE_URL}/api/get-Evaluation-Details`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/get-evaluation-details`,
         {
           params: { evaluation_id },
         }
@@ -720,25 +662,22 @@ const Dashboard = ({}) => {
         let response;
 
         if (isCoordinator) {
-          const res = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              withCredentials: true,
-            }
-          );
+          const res = await axiosClient.get(`/api/get-program-coordinator`);
 
-          const dataJSON = res.data;
-          const program = dataJSON[0]?.name;
+          const data = res.data;
+          const program = data[0]?.name;
 
-          response = await axiosClient(
+          response = await axiosClient.get(
             `/api/evaluation-stats?program=${program}`
           );
-        } else {
-          response = await axiosClient(`/api/evaluation-stats`);
+        }
+        else {
+          response = await axiosClient.get(
+            `/api/evaluation-stats`
+          );
         }
         const data = response.data;
 
-        console.log("Evaluation Stats Data:", data); // Log API response
         setEvaluations({
           total: data[0]?.totalevaluations ?? 0,
           acknowledged: data[0]?.acknowledgedevaluations ?? 0,
@@ -770,25 +709,22 @@ const Dashboard = ({}) => {
 
         let response;
         if (isCoordinator) {
-          const res = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/get-program-coordinator`,
-            {
-              withCredentials: true,
-            }
-          );
+          const res = await axiosClient.get(`/api/get-program-coordinator`);
           const data = res.data;
           const program = data[0]?.name;
 
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`
-          );
-        } else {
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats?program=${program}`);
+        }
+        else {
           response = await axiosClient.get(
-            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`
-          );
+            `${process.env.REACT_APP_API_BASE_URL}/api/dashboard-stats`);
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
 
-        const data = await response.data;
+        const data = response.data;
         setStats(data);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -806,7 +742,7 @@ const Dashboard = ({}) => {
     const fetchSocialEnterprises = async () => {
       try {
         const response = await axiosClient.get(
-          `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesWithMentorship`
+          `${process.env.REACT_APP_API_BASE_URL}/api/get-all-social-enterprises-with-mentorship`
         );
         const data = response.data;
 
@@ -854,14 +790,18 @@ const Dashboard = ({}) => {
     }
   };
 
-  console.log("View: ", isCoordinatorView);
+  console.log("View: ", isCoordinatorView)
 
   return (
     <Box m="20px">
       {/* HEADER and TOGGLE SWITCH */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Header
-          title={isCoordinatorView ? "LSEED Dashboard" : "Mentor Dashboard"}
+          title={
+            isCoordinatorView
+              ? "LSEED Dashboard"
+              : "Mentor Dashboard"
+          }
           subtitle={
             isCoordinatorView
               ? "Welcome to LSEED Dashboard"
@@ -913,18 +853,14 @@ const Dashboard = ({}) => {
                   parseInt(stats?.mentorCountTotal[0]?.count)
                 }
                 increase={
-                  isNaN(
-                    parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
-                      parseInt(stats?.mentorCountTotal[0]?.count)
-                  )
+                  isNaN(parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
+                    parseInt(stats?.mentorCountTotal[0]?.count))
                     ? "0%"
-                    : `${(
-                        (parseInt(
-                          stats?.mentorWithoutMentorshipCount[0]?.count
-                        ) /
-                          parseInt(stats?.mentorCountTotal[0]?.count)) *
-                        100
-                      ).toFixed(2)}%`
+                    :
+                    `${((parseInt(stats?.mentorWithoutMentorshipCount[0]?.count) /
+                      parseInt(stats?.mentorCountTotal[0]?.count)) *
+                      100
+                    ).toFixed(2)}%`
                 }
                 icon={
                   <PersonIcon
@@ -950,17 +886,13 @@ const Dashboard = ({}) => {
                   parseInt(stats?.mentorCountTotal[0]?.count)
                 }
                 increase={
-                  isNaN(
-                    parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
-                      parseInt(stats?.mentorCountTotal[0]?.count)
-                  )
-                    ? "0%"
-                    : `${(
-                        (parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
-                          parseInt(stats?.mentorCountTotal[0]?.count)) *
-                        100
-                      ).toFixed(2)}%`
-                }
+                  isNaN(parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
+                    parseInt(stats?.mentorCountTotal[0]?.count))
+                    ? "0%" :
+                    `${((parseInt(stats?.mentorWithMentorshipCount[0]?.count) /
+                      parseInt(stats?.mentorCountTotal[0]?.count)) *
+                      100
+                    ).toFixed(2)}%`}
                 icon={
                   <PersonIcon
                     sx={{ fontSize: "26px", color: colors.blueAccent[500] }}
@@ -991,7 +923,7 @@ const Dashboard = ({}) => {
                         fontSize: "16px",
                         lineHeight: 1.2,
                         wordBreak: "keep-all", // prevent mid-word breaks
-                        whiteSpace: "nowrap", // keep full phrase on one line
+                        whiteSpace: "nowrap",  // keep full phrase on one line
                       }}
                     >
                       {stats.totalSocialEnterprises === 1
@@ -1025,9 +957,8 @@ const Dashboard = ({}) => {
               bgcolor={colors.primary[400]}
             >
               <Chip
-                label={`${stats.totalPrograms} LSEED ${
-                  stats.totalPrograms === 1 ? "Program" : "Programs"
-                }`}
+                label={`${stats.totalPrograms} LSEED ${stats.totalPrograms === 1 ? "Program" : "Programs"
+                  }`}
                 icon={
                   <SchoolIcon
                     sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
@@ -1163,10 +1094,9 @@ const Dashboard = ({}) => {
                     backgroundColor: colors.primary[400],
                     "& .MuiDataGrid-root": { border: "none" },
                     "& .MuiDataGrid-cell": { borderBottom: "none" },
-                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
-                      {
-                        backgroundColor: colors.blueAccent[700] + " !important",
-                      },
+                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                      backgroundColor: colors.blueAccent[700] + " !important",
+                    },
                     "& .MuiDataGrid-virtualScroller": {
                       backgroundColor: colors.primary[400],
                     },
@@ -1206,10 +1136,9 @@ const Dashboard = ({}) => {
                     backgroundColor: colors.primary[400],
                     "& .MuiDataGrid-root": { border: "none" },
                     "& .MuiDataGrid-cell": { borderBottom: "none" },
-                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
-                      {
-                        backgroundColor: colors.blueAccent[700] + " !important",
-                      },
+                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                      backgroundColor: colors.blueAccent[700] + " !important",
+                    },
                     "& .MuiDataGrid-virtualScroller": {
                       backgroundColor: colors.primary[400],
                     },
@@ -1226,20 +1155,16 @@ const Dashboard = ({}) => {
                     <DataGrid
                       rows={mentorSchedules.map((schedule) => ({
                         id: schedule.mentoring_session_id,
-                        sessionDetails: `Mentoring Session for ${
-                          schedule.team_name || "Unknown SE"
-                        } with Mentor ${
-                          schedule.mentor_name || "Unknown Mentor"
-                        }`,
-                        date:
-                          `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` ||
-                          "N/A",
+                        sessionDetails: `Mentoring Session for ${schedule.team_name || "Unknown SE"
+                          } with Mentor ${schedule.mentor_name || "Unknown Mentor"
+                          }`,
+                        date: `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` || "N/A",
                         time: schedule.mentoring_session_time || "N/A",
                         zoom: schedule.zoom_link || "N/A",
                         mentorship_id: schedule.mentorship_id,
                         status: schedule.status || "Pending",
-                        realDate: schedule.mentoring_session_date || "N/A", // for backend
-                        realTime: schedule.mentoring_session_time || "N/A", // for backend
+                        realDate: schedule.mentoring_session_date || "N/A",     // for backend
+                        realTime: schedule.mentoring_session_time || "N/A",     // for backend
                       }))}
                       sx={{
                         "& .MuiDataGrid-cell": {
@@ -1253,7 +1178,7 @@ const Dashboard = ({}) => {
                           wordBreak: "break-word",
                         },
                       }}
-                      getRowHeight={() => "auto"}
+                      getRowHeight={() => 'auto'}
                       columns={pendingScheduleColumns}
                       pageSize={5}
                       rowsPerPageOptions={[5, 10]}
@@ -1360,10 +1285,9 @@ const Dashboard = ({}) => {
                     "& .MuiDataGrid-root": { border: "none" },
                     "& .MuiDataGrid-cell": { borderBottom: "none" },
                     "& .name-column--cell": { color: colors.greenAccent[300] },
-                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
-                      {
-                        backgroundColor: colors.blueAccent[700] + " !important",
-                      },
+                    "& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                      backgroundColor: colors.blueAccent[700] + " !important",
+                    },
                     "& .MuiDataGrid-virtualScroller": {
                       backgroundColor: colors.primary[400],
                     },
@@ -1407,14 +1331,8 @@ const Dashboard = ({}) => {
               justifyContent="center"
               p="20px"
             >
-              <AssignmentTurnedInOutlinedIcon
-                sx={{ fontSize: 40, color: colors.greenAccent[500], mb: 1 }}
-              />
-              <Typography
-                variant="h4"
-                fontWeight="bold"
-                color={colors.grey[100]}
-              >
+              <AssignmentTurnedInOutlinedIcon sx={{ fontSize: 40, color: colors.greenAccent[500], mb: 1 }} />
+              <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
                 {mentorDashboardStats?.totalEvalMade ?? 0}
               </Typography>
               <Typography variant="subtitle2" color={colors.grey[300]}>
@@ -1432,14 +1350,8 @@ const Dashboard = ({}) => {
               justifyContent="center"
               p="20px"
             >
-              <Star
-                sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }}
-              />
-              <Typography
-                variant="h4"
-                fontWeight="bold"
-                color={colors.grey[100]}
-              >
+              <Star sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }} />
+              <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
                 {(mentorDashboardStats?.avgRatingGiven ?? 0).toFixed(2)}
               </Typography>
               <Typography variant="subtitle2" color={colors.grey[300]}>
@@ -1457,14 +1369,8 @@ const Dashboard = ({}) => {
               justifyContent="center"
               p="20px"
             >
-              <Star
-                sx={{ fontSize: 40, color: colors.redAccent[500], mb: 1 }}
-              />
-              <Typography
-                variant="h4"
-                fontWeight="bold"
-                color={colors.grey[100]}
-              >
+              <Star sx={{ fontSize: 40, color: colors.redAccent[500], mb: 1 }} />
+              <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
                 {mentorDashboardStats?.mostCommonRating ?? 0}
               </Typography>
               <Typography variant="subtitle2" color={colors.grey[300]}>
@@ -1482,14 +1388,8 @@ const Dashboard = ({}) => {
               justifyContent="center"
               p="20px"
             >
-              <Diversity2OutlinedIcon
-                sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }}
-              />
-              <Typography
-                variant="h4"
-                fontWeight="bold"
-                color={colors.grey[100]}
-              >
+              <Diversity2OutlinedIcon sx={{ fontSize: 40, color: colors.blueAccent[500], mb: 1 }} />
+              <Typography variant="h4" fontWeight="bold" color={colors.grey[100]}>
                 {mentorDashboardStats?.mentorshipsCount ?? 0}
               </Typography>
               <Typography variant="subtitle2" color={colors.grey[300]}>
@@ -1538,7 +1438,7 @@ const Dashboard = ({}) => {
                   columns={mentorColumns}
                   pageSize={5}
                   rowsPerPageOptions={[5, 10]}
-                  getRowHeight={() => "auto"}
+                  getRowHeight={() => 'auto'}
                   // REFERERENCE for GridToolbar
                   sx={{
                     "& .MuiDataGrid-cell": {
@@ -1593,7 +1493,7 @@ const Dashboard = ({}) => {
               <Button
                 variant="contained"
                 startIcon={<SupervisorAccountOutlinedIcon />}
-                onClick={() => navigate("/api/mentorships")}
+                onClick={() => navigate("/mentorships")}
                 sx={{
                   flexGrow: 1,
                   backgroundColor: colors.blueAccent[800],
@@ -1679,12 +1579,10 @@ const Dashboard = ({}) => {
                 <DataGrid
                   rows={upcomingSchedules.map((schedule) => ({
                     id: schedule.mentoring_session_id,
-                    sessionDetails: `Mentoring Session for ${
-                      schedule.team_name || "Unknown SE"
-                    } with Mentor ${schedule.mentor_name || "Unknown Mentor"}`,
-                    date:
-                      `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` ||
-                      "N/A",
+                    sessionDetails: `Mentoring Session for ${schedule.team_name || "Unknown SE"
+                      } with Mentor ${schedule.mentor_name || "Unknown Mentor"
+                      }`,
+                    date: `${schedule.mentoring_session_date}, ${schedule.mentoring_session_time}` || "N/A",
                     time: schedule.mentoring_session_time || "N/A",
                     zoom: schedule.zoom_link || "N/A",
                     mentorship_id: schedule.mentorship_id,
@@ -1702,7 +1600,7 @@ const Dashboard = ({}) => {
                       wordBreak: "break-word",
                     },
                   }}
-                  getRowHeight={() => "auto"}
+                  getRowHeight={() => 'auto'}
                   columns={upcomingAcceptedSchedColumn}
                   pageSize={5}
                   rowsPerPageOptions={[5, 10]}
@@ -1791,7 +1689,7 @@ const Dashboard = ({}) => {
 
               {/* Categories Section */}
               {selectedEvaluation.categories &&
-              selectedEvaluation.categories.length > 0 ? (
+                selectedEvaluation.categories.length > 0 ? (
                 selectedEvaluation.categories.map((category, index) => (
                   <Box
                     key={index}
@@ -1810,12 +1708,15 @@ const Dashboard = ({}) => {
                         marginBottom: "8px",
                       }}
                     >
-                      {category.category_name} - Rating: {category.star_rating}{" "}
-                      ★
+                      {category.category_name} - Rating:{" "}
+                      {category.star_rating} ★
                     </Typography>
 
                     {/* Selected Comments */}
-                    <Typography variant="body1" sx={{ marginBottom: "8px" }}>
+                    <Typography
+                      variant="body1"
+                      sx={{ marginBottom: "8px" }}
+                    >
                       Comments:{" "}
                       {category.selected_comments.length > 0 ? (
                         category.selected_comments.join(", ")
@@ -1847,7 +1748,9 @@ const Dashboard = ({}) => {
         </DialogContent>
 
         {/* Action Buttons */}
-        <DialogActions sx={{ padding: "16px", borderTop: "1px solid #000" }}>
+        <DialogActions
+          sx={{ padding: "16px", borderTop: "1px solid #000" }}
+        >
           <Button
             onClick={() => setOpenDialog(false)}
             sx={{

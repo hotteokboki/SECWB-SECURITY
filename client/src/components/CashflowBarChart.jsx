@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { ResponsiveBar } from "@nivo/bar";
 import { useTheme, Button, MenuItem, Select, Typography } from "@mui/material";
 import { tokens } from "../theme";
 import { useAuth } from "../context/authContext";
+import axiosClient from "../api/axiosClient";
 
 const CustomTooltip = ({ value, indexValue, id, data }) => {
   const entry = data.find((d) => d.category === indexValue);
@@ -72,7 +72,7 @@ const CustomTooltip = ({ value, indexValue, id, data }) => {
   );
 };
 
-const CashFlowBarChart = ({}) => {
+const CashFlowBarChart = ({ }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { user } = useAuth();
@@ -97,14 +97,18 @@ const CashFlowBarChart = ({}) => {
 
           const program = res.data[0]?.name;
 
-          response = await axios.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesForComparison`,
-            { params: { program } }
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesForComparison`,
+            {
+              params: { program },
+              withCredentials: true,
+            }
           );
         } else {
-          response = await axios.get(
-            `${process.env.REACT_APP_API_BASE_URL}/getAllSocialEnterprisesForComparison`
-          );
+          response = await axiosClient.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/getAllSocialEnterprisesForComparison`, {
+            withCredentials: true,
+          });
         }
         setSeList(response.data);
       } catch (error) {
@@ -123,7 +127,7 @@ const CashFlowBarChart = ({}) => {
   const fetchComparisonData = async (se1, se2) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/cashflow`);
+      const response = await axiosClient.get(`/api/cashflow`);
 
       // Filter cashflow data for the selected SEs
       const filtered = response.data.filter(
@@ -235,11 +239,11 @@ const CashFlowBarChart = ({}) => {
                 keys={
                   selectedSEs.length === 2
                     ? [
-                        `${selectedSEs[0].id}_inflow`,
-                        `${selectedSEs[1].id}_inflow`,
-                        `${selectedSEs[0].id}_outflow`,
-                        `${selectedSEs[1].id}_outflow`,
-                      ]
+                      `${selectedSEs[0].id}_inflow`,
+                      `${selectedSEs[1].id}_inflow`,
+                      `${selectedSEs[0].id}_outflow`,
+                      `${selectedSEs[1].id}_outflow`,
+                    ]
                     : []
                 }
                 indexBy="category"

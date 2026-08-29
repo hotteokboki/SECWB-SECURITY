@@ -1,0 +1,623 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model active_sessions {
+  session_id String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String? @db.Uuid
+  users      users?  @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model asset {
+  asset_id             String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  asset_name           String                 @unique
+  asset_amount         Decimal                @db.Decimal(12, 2)
+  cash_in_transaction  cash_in_transaction[]
+  cash_out_transaction cash_out_transaction[]
+}
+
+model audit_logs {
+  log_id     String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  action     String
+  details    Json?
+  timestamp  DateTime? @default(now()) @db.Timestamptz(6)
+  ip_address String?
+  users      users?    @relation(fields: [user_id], references: [user_id], onUpdate: NoAction)
+
+  @@index([timestamp(sort: Desc)], map: "idx_audit_logs_timestamp")
+  @@index([user_id], map: "idx_audit_logs_user_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model bill_of_materials {
+  bom_id             String  @db.Uuid
+  record_id          String  @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  raw_material_name  String
+  raw_material_price Decimal @db.Decimal(12, 2)
+  raw_material_qty   Decimal @db.Decimal(12, 2)
+  bom                bom     @relation(fields: [bom_id], references: [bom_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bom_in_bomlines")
+
+  @@id([bom_id, record_id])
+}
+
+model bom {
+  bom_id            String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bom_name          String              @unique
+  bill_of_materials bill_of_materials[]
+  item              item[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cash_in_report {
+  cash_in_report_id   String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  se_id               String                @db.Uuid
+  report_month        DateTime              @db.Date
+  socialenterprises   socialenterprises     @relation(fields: [se_id], references: [se_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_se_cash_in_rep")
+  cash_in_transaction cash_in_transaction[]
+
+  @@unique([se_id, report_month], map: "uq_cin_se_month")
+  @@index([se_id, report_month], map: "idx_cin_report_se_month")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cash_in_transaction {
+  transaction_id        String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  cash_in_report_id     String         @db.Uuid
+  transaction_date      DateTime       @db.Date
+  cash_amount           Decimal        @default(0) @db.Decimal(12, 2)
+  sales_amount          Decimal        @default(0) @db.Decimal(12, 2)
+  other_revenue_amount  Decimal        @default(0) @db.Decimal(12, 2)
+  asset_id              String?        @db.Uuid
+  liability_amount      Decimal        @default(0) @db.Decimal(12, 2)
+  owners_capital_amount Decimal        @default(0) @db.Decimal(12, 2)
+  note                  String?
+  entered_by            String?
+  client_txn_key        String?        @unique(map: "uq_cin_client_key")
+  asset                 asset?         @relation(fields: [asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_asset_in_cin")
+  cash_in_report        cash_in_report @relation(fields: [cash_in_report_id], references: [cash_in_report_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cash_in_report")
+
+  @@index([asset_id], map: "idx_cin_tx_asset")
+  @@index([transaction_date], map: "idx_cin_tx_date")
+  @@index([cash_in_report_id], map: "idx_cin_tx_report_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cash_out_report {
+  cash_out_report_id   String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  se_id                String                 @db.Uuid
+  report_month         DateTime               @db.Date
+  socialenterprises    socialenterprises      @relation(fields: [se_id], references: [se_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_se_cash_out_rep")
+  cash_out_transaction cash_out_transaction[]
+
+  @@unique([se_id, report_month], map: "uq_cout_se_month")
+  @@index([se_id, report_month], map: "idx_cout_report_se_month")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model cash_out_transaction {
+  transaction_id           String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  cash_out_report_id       String          @db.Uuid
+  transaction_date         DateTime        @db.Date
+  cash_amount              Decimal         @default(0) @db.Decimal(12, 2)
+  expense_id               String?         @db.Uuid
+  asset_id                 String?         @db.Uuid
+  inventory_amount         Decimal         @default(0) @db.Decimal(12, 2)
+  liability_amount         Decimal         @default(0) @db.Decimal(12, 2)
+  owners_withdrawal_amount Decimal         @default(0) @db.Decimal(12, 2)
+  note                     String?
+  entered_by               String?
+  client_txn_key           String?         @unique(map: "uq_cout_client_key")
+  asset                    asset?          @relation(fields: [asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_asset_in_cout")
+  cash_out_report          cash_out_report @relation(fields: [cash_out_report_id], references: [cash_out_report_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cash_out_report")
+  expense                  expense?        @relation(fields: [expense_id], references: [expense_id], onUpdate: NoAction, map: "fk_expense_in_cout")
+
+  @@index([asset_id], map: "idx_cout_tx_asset")
+  @@index([transaction_date], map: "idx_cout_tx_date")
+  @@index([expense_id], map: "idx_cout_tx_expense")
+  @@index([cash_out_report_id], map: "idx_cout_tx_report_id")
+}
+
+model collaboration_tiers {
+  tier_id                           Int                                 @id
+  tier_name                         String
+  tier_description                  String?
+  mentorship_collaboration_requests mentorship_collaboration_requests[]
+  mentorship_collaborations         mentorship_collaborations[]
+}
+
+model coordinator_invites {
+  invite_id  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String
+  token      String
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  expires_at DateTime? @default(dbgenerated("(now() + '7 days'::interval)")) @db.Timestamp(6)
+}
+
+model documents {
+  document_id   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name          String?
+  link          String?
+  date_uploaded DateTime? @db.Date
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model evaluation_categories {
+  evaluation_category_id       String                         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  evaluation_id                String                         @db.Uuid
+  category_name                String
+  rating                       Int?
+  additional_comment           String?
+  evaluations                  evaluations                    @relation(fields: [evaluation_id], references: [evaluation_id], onDelete: Cascade, onUpdate: NoAction)
+  evaluation_selected_comments evaluation_selected_comments[]
+}
+
+model evaluation_selected_comments {
+  selected_comment_id    String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  evaluation_category_id String                @db.Uuid
+  comment                String
+  evaluation_categories  evaluation_categories @relation(fields: [evaluation_category_id], references: [evaluation_category_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model evaluations {
+  evaluation_id         String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  mentor_id             String?                 @db.Uuid
+  se_id                 String?                 @db.Uuid
+  created_at            DateTime?               @db.Date
+  isAcknowledge         Boolean?                @default(false)
+  evaluation_type       evaluation_type_enum?
+  evaluation_categories evaluation_categories[]
+  mentors               mentors?                @relation(fields: [mentor_id], references: [mentor_id], onDelete: NoAction, onUpdate: NoAction, map: "mentor_id")
+  socialenterprises     socialenterprises?      @relation(fields: [se_id], references: [se_id], onDelete: NoAction, onUpdate: NoAction, map: "se_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model expense {
+  expense_id           String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  expense_name         String                 @unique
+  expense_amount       Decimal                @db.Decimal(12, 2)
+  cash_out_transaction cash_out_transaction[]
+}
+
+model feedback {
+  feedback_id       String       @id(map: "Feedback_pkey") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  mentorship_id     String?      @db.Uuid
+  cmnt_id           String?      @db.Uuid
+  rating            Int?
+  isAckowledgedBySE Boolean?
+  mentorships       mentorships? @relation(fields: [mentorship_id], references: [mentorship_id], onDelete: NoAction, onUpdate: NoAction, map: "mentorship_ID")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model inventory_report {
+  inventory_id      String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  se_id             String            @db.Uuid
+  month             DateTime          @db.Date
+  item_id           String            @db.Uuid
+  begin_qty         Decimal?          @db.Decimal(12, 2)
+  begin_unit_price  Decimal?          @db.Decimal(12, 2)
+  final_qty         Decimal?          @db.Decimal(12, 2)
+  final_unit_price  Decimal?          @db.Decimal(12, 2)
+  item              item              @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_item_inv_rep")
+  socialenterprises socialenterprises @relation(fields: [se_id], references: [se_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_se_inv_rep")
+
+  @@unique([se_id, month, item_id], map: "uq_inventory_per_item_per_month")
+  @@index([item_id], map: "idx_inventory_report_item")
+  @@index([se_id, month], map: "idx_inventory_report_se_month")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model item {
+  item_id                  String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  item_name                String
+  item_price               Decimal            @db.Decimal(12, 2)
+  item_beginning_inventory Decimal            @default(0) @db.Decimal(12, 2)
+  item_less_count          Decimal            @default(0) @db.Decimal(12, 2)
+  bom_id                   String?            @db.Uuid
+  inventory_report         inventory_report[]
+  bom                      bom?               @relation(fields: [bom_id], references: [bom_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bom_in_item")
+
+  @@index([bom_id], map: "idx_item_bom_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mentees_form_submissions {
+  serial_number            Int                 @id @default(autoincrement())
+  id                       String?             @unique @default(dbgenerated("('SE-APPLICATION-'::text || lpad((serial_number)::text, 4, '0'::text))"))
+  timestamp                DateTime?           @default(now()) @db.Timestamp(6)
+  consent                  Boolean?
+  team_name                String?
+  enterprise_idea_start    String?
+  involved_people          String?
+  current_phase            String?
+  se_nature                String?
+  team_characteristics     String?
+  critical_areas           String[]
+  action_plans             String?
+  meeting_frequency        String?
+  communication_modes      String[]
+  social_media_link        String?
+  focal_person_contact     String?
+  mentoring_team_members   String?
+  preferred_mentoring_time String[]
+  mentoring_time_note      String?
+  pitch_deck_url           String?
+  se_abbreviation          String?
+  focal_email              String?
+  focal_phone              String?
+  status                   String?             @default("Pending")
+  se_description           String?
+  social_problem           String[]
+  team_challenges          String[]
+  socialenterprises        socialenterprises[]
+}
+
+model mentor_evaluation_questions {
+  category      String @db.VarChar(255)
+  question_text String
+  id            String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mentor_form_application {
+  serial_number      Int       @id @default(autoincrement())
+  id                 String?   @unique @default(dbgenerated("('MENTOR-'::text || lpad((serial_number)::text, 4, '0'::text))"))
+  first_name         String
+  last_name          String
+  email              String    @unique
+  password           String
+  affiliation        String
+  motivation         String
+  expertise          String
+  business_areas     String[]
+  preferred_time     String[]
+  communication_mode String[]
+  status             String?   @default("Pending")
+  submitted_at       DateTime? @default(now()) @db.Timestamp(6)
+  contact_no         String?
+  mentors            mentors?
+
+  @@index([status])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mentoring_session {
+  mentoring_session_id   String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  mentorship_id          String      @db.Uuid
+  start_time             DateTime    @db.Timestamp(6)
+  end_time               DateTime    @db.Timestamp(6)
+  zoom_link              String?
+  status                 String?     @default("No Schedule Yet") @db.VarChar(20)
+  mentoring_session_date DateTime    @db.Date
+  mentorships            mentorships @relation(fields: [mentorship_id], references: [mentorship_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_mentorship")
+}
+
+model mentors {
+  mentor_id                         String                              @id(map: "Mentors_pkey") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  mentor_firstname                  String?
+  mentor_lastname                   String?
+  number_SE_assigned                Int?                                @default(0)
+  email                             String?
+  contactnum                        String?
+  isactive                          Boolean?                            @default(true)
+  status                            String?                             @default("Active") @db.VarChar(20)
+  critical_areas                    String[]
+  is_available_for_assignment       Boolean?                            @default(true)
+  preferred_mentoring_time          String[]
+  accepted_application_id           String?                             @unique(map: "mentors_unique_application")
+  evaluations                       evaluations[]
+  mentor_form_application           mentor_form_application?            @relation(fields: [accepted_application_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_accepted_application")
+  users                             users                               @relation(fields: [mentor_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "mentor_id")
+  mentorship_collaboration_requests mentorship_collaboration_requests[]
+  mentorships                       mentorships[]
+  telegrambot                       telegrambot[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mentorship_collaboration_requests {
+  mentorship_collaboration_request_id     String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tier                                    Int
+  seeking_collaboration_mentor_name       String
+  seeking_collaboration_se_name           String
+  seeking_collaboration_se_abbreviation   String
+  suggested_collaboration_mentor_name     String
+  suggested_collaboration_se_name         String
+  suggested_collaboration_se_abbreviation String
+  matched_categories                      String[]
+  seeking_collaboration_se_strengths      String[]
+  seeking_collaboration_se_weaknesses     String[]
+  suggested_collaboration_se_strengths    String[]
+  suggested_collaboration_se_weaknesses   String[]
+  created_at                              DateTime                    @default(now()) @db.Timestamptz(6)
+  suggested_collaboration_mentor_id       String                      @db.Uuid
+  collaboration_card_id                   String
+  subtier                                 Int?
+  status                                  String                      @default("Pending")
+  collaboration_tiers                     collaboration_tiers         @relation(fields: [tier], references: [tier_id], map: "fk_collaboration_tier")
+  mentors                                 mentors                     @relation(fields: [suggested_collaboration_mentor_id], references: [mentor_id], map: "fk_suggested_mentor")
+  mentorship_collaborations               mentorship_collaborations[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mentorship_collaborations {
+  collaboration_id                                                                        String                            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  seeking_collaboration_mentorship_id                                                     String                            @db.Uuid
+  suggested_collaborator_mentorship_id                                                    String                            @db.Uuid
+  tier_id                                                                                 Int                               @default(1)
+  mentorship_collaboration_request_id                                                     String                            @db.Uuid
+  status                                                                                  Boolean?                          @default(true)
+  created_at                                                                              DateTime?                         @default(now()) @db.Timestamp(6)
+  mentorship_collaboration_requests                                                       mentorship_collaboration_requests @relation(fields: [mentorship_collaboration_request_id], references: [mentorship_collaboration_request_id], map: "fk_collaboration_request")
+  mentorships_mentorship_collaborations_seeking_collaboration_mentorship_idTomentorships  mentorships                       @relation("mentorship_collaborations_seeking_collaboration_mentorship_idTomentorships", fields: [seeking_collaboration_mentorship_id], references: [mentorship_id], onDelete: Cascade, map: "fk_seeking_collab_mentorship")
+  mentorships_mentorship_collaborations_suggested_collaborator_mentorship_idTomentorships mentorships                       @relation("mentorship_collaborations_suggested_collaborator_mentorship_idTomentorships", fields: [suggested_collaborator_mentorship_id], references: [mentorship_id], onDelete: Cascade, map: "fk_suggested_collab_mentorship")
+  collaboration_tiers                                                                     collaboration_tiers               @relation(fields: [tier_id], references: [tier_id], map: "fk_tier")
+
+  @@unique([seeking_collaboration_mentorship_id, suggested_collaborator_mentorship_id, tier_id], map: "unique_directional_pair_per_tier")
+}
+
+model mentorships {
+  mentorship_id                                                                                         String                      @id(map: "Mentorships_pkey") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  mentor_id                                                                                             String?                     @db.Uuid
+  se_id                                                                                                 String?                     @db.Uuid
+  status                                                                                                mentorship_status?          @default(Active)
+  start_date                                                                                            DateTime?                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  end_date                                                                                              DateTime?                   @db.Date
+  feedback                                                                                              feedback[]
+  mentoring_session                                                                                     mentoring_session[]
+  mentorship_collaborations_mentorship_collaborations_seeking_collaboration_mentorship_idTomentorships  mentorship_collaborations[] @relation("mentorship_collaborations_seeking_collaboration_mentorship_idTomentorships")
+  mentorship_collaborations_mentorship_collaborations_suggested_collaborator_mentorship_idTomentorships mentorship_collaborations[] @relation("mentorship_collaborations_suggested_collaborator_mentorship_idTomentorships")
+  mentors                                                                                               mentors?                    @relation(fields: [mentor_id], references: [mentor_id], onDelete: NoAction, onUpdate: NoAction, map: "mentorships_mentor_fkey")
+  socialenterprises                                                                                     socialenterprises?          @relation(fields: [se_id], references: [se_id], onDelete: NoAction, onUpdate: NoAction, map: "mentorships_se_fkey")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model monthly_report_guard {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  se_id       String   @db.Uuid
+  month       DateTime @db.Date
+  report_type String
+
+  @@unique([se_id, month, report_type], map: "uq_mrg_se_month_type")
+}
+
+model notification {
+  notification_id String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  receiver_id     String?   @db.Uuid
+  title           String?
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  target_route    String?
+  message         String?
+  is_read         Boolean?  @default(false)
+  users           users?    @relation(fields: [receiver_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "user_id")
+}
+
+model password_history {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id       String   @db.Uuid
+  password_hash String
+  changed_at    DateTime @default(now()) @db.Timestamptz(6)
+  users         users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, changed_at(sort: Desc)], map: "idx_password_history_user")
+}
+
+model password_reset_tokens {
+  token      String
+  expires_at DateTime @db.Timestamp(6)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?  @db.Uuid
+}
+
+model predefined_comments {
+  comment_id    String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  category_name String?
+  rating        Int?
+  comment_text  String?
+}
+
+model program_assignment {
+  program_assignment_id String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id               String    @db.Uuid
+  program_id            String    @db.Uuid
+  assigned_at           DateTime? @default(now()) @db.Timestamp(6)
+  programs              programs  @relation(fields: [program_id], references: [program_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_program")
+  users                 users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user")
+
+  @@unique([user_id, program_id], map: "unique_user_program")
+  @@index([user_id], map: "idx_program_assignment_user")
+}
+
+model programs {
+  program_id         String               @id(map: "Programs_pkey") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name               String?
+  description        String?
+  program_assignment program_assignment[]
+  socialenterprises  socialenterprises[]
+}
+
+model sdg {
+  sdg_id     String  @id(map: "SDG_pkey") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name       String?
+  sdg_number Int?
+}
+
+model session {
+  sid    String   @id @db.VarChar(255)
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+}
+
+model signup_passwords {
+  id          Int      @id @default(autoincrement())
+  password    String
+  valid_from  DateTime @default(now()) @db.Timestamp(6)
+  valid_until DateTime @db.Timestamp(6)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+}
+
+model socialenterprises {
+  se_id                    String                    @id(map: "SocialEnterprises_pkey") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  team_name                String?
+  program_id               String                    @db.Uuid
+  nummember                Int?
+  sdg_id                   String[]                  @db.Uuid
+  abbr                     String?
+  created_at               DateTime?                 @default(dbgenerated("CURRENT_DATE")) @db.Date
+  contactnum               String?
+  isactive                 Boolean?                  @default(true)
+  critical_areas           String[]                  @default([])
+  description              String?
+  preferred_mentoring_time String[]
+  mentoring_time_note      String?
+  accepted_application_id  String?
+  cash_in_report           cash_in_report[]
+  cash_out_report          cash_out_report[]
+  evaluations              evaluations[]
+  inventory_report         inventory_report[]
+  mentorships              mentorships[]
+  mentees_form_submissions mentees_form_submissions? @relation(fields: [accepted_application_id], references: [id], onUpdate: NoAction, map: "fk_accepted_application")
+  programs                 programs                  @relation(fields: [program_id], references: [program_id], onDelete: NoAction, onUpdate: NoAction, map: "program_ID")
+  telegrambot              telegrambot[]
+}
+
+model telegram_password {
+  tg_id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  password     String?
+  date_created DateTime? @default(dbgenerated("((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila'::text))::date")) @db.Date
+  time_created DateTime? @default(dbgenerated("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila'::text)")) @db.Timestamptz(6)
+}
+
+model telegrambot {
+  username          String?
+  firstName         String?
+  lastName          String?
+  mentor_id         String?            @db.Uuid
+  rating            Int?
+  comments          String?
+  isAcknowledge     Boolean?
+  se_id             String?            @db.Uuid
+  chatid            BigInt             @id
+  mentors           mentors?           @relation(fields: [mentor_id], references: [mentor_id], onDelete: NoAction, onUpdate: NoAction, map: "mentor_ID")
+  socialenterprises socialenterprises? @relation(fields: [se_id], references: [se_id], onDelete: NoAction, onUpdate: NoAction, map: "se_ID")
+}
+
+model user_has_roles {
+  user_id    String     @db.Uuid
+  role_name  String     @db.VarChar(50)
+  user_roles user_roles @relation(fields: [role_name], references: [role], onUpdate: NoAction, map: "fk_role_name")
+  users      users      @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user")
+
+  @@id([user_id, role_name])
+  @@unique([user_id, role_name], map: "user_has_roles_unique")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_login_audit {
+  id            BigInt    @id @default(autoincrement())
+  user_id       String?   @db.Uuid
+  email         String?
+  attempted_at  DateTime? @default(now()) @db.Timestamptz(6)
+  ip            String?   @db.Inet
+  user_agent    String?
+  success       Boolean
+  twofa_pending Boolean   @default(false)
+  status_code   Int
+  session_id    String?
+  users         users?    @relation(fields: [user_id], references: [user_id], onUpdate: NoAction, map: "user_login_audit_user_fk")
+
+  @@index([user_id, attempted_at(sort: Desc)], map: "idx_login_audit_user_success_time", where: raw("(success = true)"))
+  @@index([user_id, attempted_at(sort: Desc)], map: "idx_login_audit_user_time")
+}
+
+model user_roles {
+  role             String           @id
+  user_has_roles   user_has_roles[]
+  user_roles       user_roles       @relation("user_rolesTouser_roles", fields: [role], references: [role], onDelete: NoAction, onUpdate: NoAction, map: "role")
+  other_user_roles user_roles?      @relation("user_rolesTouser_roles")
+  users            users[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_security_questions {
+  id          BigInt   @id @default(autoincrement())
+  user_id     String   @db.Uuid
+  position    Int
+  question    String
+  answer_hash String
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  users       users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, position])
+  @@index([user_id], map: "idx_user_secq_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_twofa {
+  user_id               String   @id @db.Uuid
+  enabled               Boolean  @default(false)
+  secret_base32         String?
+  pending_secret_base32 String?
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+  users                 users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model users {
+  user_id                 String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  first_name              String?
+  last_name               String?
+  email                   String?                   @unique
+  password                String?
+  isactive                Boolean?                  @default(false)
+  roles                   String?                   @default("Guest User")
+  contactnum              String?
+  password_changed_at     DateTime?                 @db.Timestamptz(6)
+  active_sessions         active_sessions[]
+  audit_logs              audit_logs[]
+  mentors                 mentors?
+  notification            notification[]
+  password_history        password_history[]
+  program_assignment      program_assignment[]
+  user_has_roles          user_has_roles[]
+  user_login_audit        user_login_audit[]
+  user_security_questions user_security_questions[]
+  user_twofa              user_twofa?
+  user_roles              user_roles?               @relation(fields: [roles], references: [role], onDelete: NoAction, onUpdate: NoAction, map: "roles")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model users_backup {
+  user_id    String?  @db.Uuid
+  first_name String?
+  last_name  String?
+  email      String?
+  password   String?
+  isactive   Boolean?
+  roles      String?
+  contactnum String?
+
+  @@ignore
+}
+
+enum evaluation_type_enum {
+  Mentors
+  Social_Enterprise @map("Social Enterprise")
+}
+
+enum mentorship_status {
+  Active
+  Inactive
+}
+
+enum status {
+  Active
+  Inactive
+}

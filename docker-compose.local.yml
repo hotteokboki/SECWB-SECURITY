@@ -1,0 +1,39 @@
+# Local-only development database for LSEED Insight.
+#
+# This is a disposable PostgreSQL 16 instance (matching production's engine
+# version) used for local dev and for Prisma schema/migration tooling.
+#
+# CURRENT STATE: as of 2026-08-29, this container was deliberately loaded
+# with a FULL pg_dump (schema + real data) of production, at the project
+# owner's explicit request, for realistic local debugging. It therefore
+# currently DOES contain real production data (SE/mentor personal info).
+# Treat this container/volume with the same care as production data: don't
+# screen-share it carelessly, don't export it elsewhere, and consider wiping
+# it back to schema-only (`docker compose -f docker-compose.local.yml down -v`
+# then reload from a schema-only dump) once real-data debugging is done.
+#
+# This is intentionally separate from the root docker-compose.yml, which is
+# an unrelated (currently non-functional) attempt at containerizing the
+# backend/frontend services — not addressed here.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up -d
+#   docker compose -f docker-compose.local.yml down       # stop, keep data
+#   docker compose -f docker-compose.local.yml down -v    # stop, wipe data
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: lseed_postgres_local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${LOCAL_DB_USER:-lseed_dev}
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-lseed_dev_local}
+      POSTGRES_DB: ${LOCAL_DB_NAME:-LSEEDServer}
+    ports:
+      - "5433:5432"
+    volumes:
+      - lseed_postgres_local_data:/var/lib/postgresql/data
+
+volumes:
+  lseed_postgres_local_data:

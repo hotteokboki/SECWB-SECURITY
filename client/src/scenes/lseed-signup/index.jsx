@@ -112,7 +112,7 @@ const LSEEDSignup = () => {
     });
 
     const handleGoToLogin = () => {
-        window.location.href = `${process.env.VITE_REACT_APP_API_URL}`;
+        navigate("/", { replace: true });
     };
 
     const handleInputChange = (e) => {

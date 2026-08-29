@@ -81,6 +81,14 @@ client/.env.development
 client/.env.production
 server/.env
 
+# SECURITY: this file was found containing real live secrets (not a template)
+# and was previously untracked-but-unprotected. Ignored defensively regardless
+# of its content going forward. See project notes before ever removing this line.
+.env.development.example
+
+# Prisma generated client (regenerate via `npx prisma generate`)
+/generated
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
@@ -141,3 +149,5 @@ Dockerfile
 database.js
 .qodo
 database.js
+
+/generated/prisma

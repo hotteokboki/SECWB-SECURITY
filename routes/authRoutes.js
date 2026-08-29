@@ -178,7 +178,7 @@ router.get("/users", async (req, res) => {
           u.first_name, u.last_name;
     `;
 
-    const result = await pool.query(query);
+    const result = await pgDatabase.query(query);
 
     // Clean up the roles array from [null] to [] for users with no roles
     const usersWithCleanRoles = result.rows.map(user => {

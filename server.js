@@ -151,9 +151,21 @@ console.log(`[env] NODE_ENV=${ENV}  sameSite=${COOKIE_SAMESITE} secure=${COOKIE_
 
 app.use(cookieParser());
 
-// Set Secure headers
+// Set Secure headers.
+// helmet's defaults assume HTTPS is available — `upgrade-insecure-requests`
+// in the CSP tells browsers to rewrite every http:// sub-resource request
+// (including the JS bundle) to https://, and `hsts` tells browsers to
+// refuse plain-HTTP connections to this origin entirely for up to a year.
+// Both actively break the site while there's no TLS certificate in front of
+// it (silently: the JS bundle fails to load, producing a blank page with no
+// visible error). Gated on the same HTTPS_ENABLED flag as the cookie config
+// above — flip both together once real HTTPS is in place.
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false
+  contentSecurityPolicy: IS_PROD ? {
+    useDefaults: true,
+    directives: HTTPS_ENABLED ? {} : { 'upgrade-insecure-requests': null },
+  } : false,
+  hsts: HTTPS_ENABLED,
 }));
 
 // Set size limits BEFORE any routes

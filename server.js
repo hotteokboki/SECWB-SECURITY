@@ -133,8 +133,16 @@ const { createNotification } = require("./controllers/notificationController.js"
 const app = express();
 
 const IS_PROD = ENV === 'production';
-const COOKIE_SAMESITE = IS_PROD ? 'none' : 'lax';
-const COOKIE_SECURE = IS_PROD ? true : false;
+
+// The production VM currently serves plain HTTP — no TLS certificate yet.
+// Secure/SameSite=None cookies REQUIRE HTTPS; browsers silently drop them
+// over plain HTTP, which breaks every authenticated request even though
+// login appears to succeed. Deliberately NOT tied to IS_PROD/NODE_ENV, since
+// "production" doesn't guarantee HTTPS exists — set HTTPS_ENABLED=true once
+// a TLS certificate is actually in place in front of this app.
+const HTTPS_ENABLED = process.env.HTTPS_ENABLED === 'true';
+const COOKIE_SAMESITE = HTTPS_ENABLED ? 'none' : 'lax';
+const COOKIE_SECURE = HTTPS_ENABLED;
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -1271,10 +1279,10 @@ app.post("/logout", (req, res) => {
     try {
       // 3) Clear the express-session cookie
       res.clearCookie("connect.sid", {
-        path: "/",            // must match your session cookie config
+        path: "/",
         httpOnly: true,
-        sameSite: "strict",   // use 'lax' if that’s what you configured
-        secure: false,        // set true in HTTPS prod
+        sameSite: COOKIE_SAMESITE, // must match the attributes the cookie was set with, or the browser won't clear it
+        secure: COOKIE_SECURE,
       });
 
       return res.status(200).json({ message: "Logout successful" });
